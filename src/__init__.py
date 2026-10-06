@@ -1,0 +1,1 @@
+"""MetaInspector Desktop application package."""
