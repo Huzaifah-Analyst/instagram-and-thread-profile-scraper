@@ -61,7 +61,7 @@ Both developers must record every merged Pull Request in the table below to main
 | Date | PR # | Author | Branch Name | Merged By | Description & Key Files Modified |
 | :--- | :---: | :--- | :--- | :--- | :--- |
 | *2026-10-04* | - | Dev 1 & 2 | `main` | Team | Initial project documentation setup (`docs/` folder created with 6 standard specs). |
-| *Pending* | #1 | Dev 1 | `feature/core-scraper` | Dev 2 | Concurrency engine, resource blocker, and Playwright worker pool. |
+| *2026-10-06* | #1 | Andleeb Hassan | `feature/sprint1-core-engine` | Lead Architect | Merged Sprint 1 core engine: resource blocker, ban engine, extractors, 5-worker scraper, 43 unit tests passing. |
 | *Pending* | #2 | Dev 2 | `feature/desktop-gui` | Dev 1 | CustomTkinter interface, live table, and mode selectors. |
 | *Pending* | #3 | Dev 2 | `feature/sheets-exporter` | Dev 1 | TSV clipboard formatter and Google Sheets copy button. |
 | *Pending* | #4 | Dev 1 | `feature/history-db` | Dev 2 | SQLite database and history viewer dialog. |

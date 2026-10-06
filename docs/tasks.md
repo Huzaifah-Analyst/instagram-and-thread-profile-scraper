@@ -21,11 +21,11 @@
 
 | Task ID | Task Description | Assignee | Status | Acceptance / Test Criteria |
 | :--- | :--- | :--- | :---: | :--- |
-| **TSK-101** | Implement resource blocker (abort images, media, fonts) in Playwright | Dev 1 | `[ ]` | Verified network inspector shows zero image/video asset downloads; page load < 0.5s. |
-| **TSK-102** | Refactor Instagram modal extractor with dynamic polling & fallback locators | Dev 1 | `[ ]` | Test against 10 sample IG accounts; extract country and joined date accurately without crashes. |
-| **TSK-103** | Refactor Threads extractor using bounding box SVG menu detection | Dev 1 | `[ ]` | Test against 10 Threads profiles; extract country, joined date, and badge. |
-| **TSK-104** | Develop `BanLinkEngine` module for cross-platform ban propagation | Dev 2 | `[ ]` | Unit test: when IG=banned, Threads=banned and final status is BANNED. |
-| **TSK-105** | Build 5-worker concurrent dispatcher with chunking logic | Dev 1 | `[ ]` | Run 20 accounts concurrently across 5 workers; total execution finishes in under 60 seconds. |
+| **TSK-101** | Implement resource blocker (abort images, media, fonts) in Playwright | Dev 1 | `[x]` | Verified network inspector shows zero image/video asset downloads; page load < 0.5s. |
+| **TSK-102** | Refactor Instagram modal extractor with dynamic polling & fallback locators | Dev 1 | `[x]` | Test against 10 sample IG accounts; extract country and joined date accurately without crashes. |
+| **TSK-103** | Refactor Threads extractor using bounding box SVG menu detection | Dev 1 | `[x]` | Test against 10 Threads profiles; extract country, joined date, and badge. |
+| **TSK-104** | Develop `BanLinkEngine` module for cross-platform ban propagation | Dev 2 | `[x]` | Unit test: when IG=banned, Threads=banned and final status is BANNED. |
+| **TSK-105** | Build 5-worker concurrent dispatcher with chunking logic | Dev 1 | `[x]` | Run 20 accounts concurrently across 5 workers; total execution finishes in under 60 seconds. |
 
 ---
 
