@@ -3,7 +3,9 @@
 ## Document: `docs/tasks.md`
 **Project:** MetaInspector Desktop (Instagram & Threads Checker)  
 **Total Timeline:** 15 Calendar Days  
-**Team Roles:** Developer 1 (Backend & Automation Lead) | Developer 2 (Frontend & Integration Lead)  
+**Team Roles:** Partner Developer + Claude Code (implementation, both backend and frontend) | Claude Code — Owner's session (architecture, review, merge — role formerly held by Antigravity AI)  
+
+> Note: the "Dev 1 / Dev 2" assignee split below was the original two-person plan. In practice every task was implemented by the Partner Developer + Claude pairing; the column is kept only to show the intended backend/frontend split per task.
 
 ---
 
@@ -34,11 +36,13 @@
 
 | Task ID | Task Description | Assignee | Status | Acceptance / Test Criteria |
 | :--- | :--- | :--- | :---: | :--- |
-| **TSK-201** | Create base window layout, Cyber Dark color scheme, and typography tokens | Dev 2 | `[ ]` | Window launches with 1150x750 default dimensions; dark theme applied smoothly. |
-| **TSK-202** | Build Left Panel: Username text box, file import button, mode radio selectors | Dev 2 | `[ ]` | Text area accepts pastes; `.txt` import button populates usernames cleanly. |
-| **TSK-203** | Build Right Panel: Real-time data table with color-coded status badges | Dev 2 | `[ ]` | Table renders test rows with green (Active) and red (Banned) cell highlights. |
-| **TSK-204** | Implement worker-to-UI thread-safe queue for real-time row rendering | Dev 1 | `[ ]` | GUI remains fully responsive during active scraping; zero frozen window warnings. |
-| **TSK-205** | Implement one-time in-app setup browser launcher for checker login | Dev 1 | `[ ]` | Setup button opens Chromium to IG/Threads; user logs in; session cookies persist on restart. |
+| **TSK-201** | Create base window layout, Cyber Dark color scheme, and typography tokens | Dev 2 | `[x]` | Window launches with 1150x750 default dimensions; dark theme applied smoothly. Verified: `app.py`/`theme.py`, matches `design.md` tokens. |
+| **TSK-202** | Build Left Panel: Username text box, file import button, mode radio selectors | Dev 2 | `[x]` | Text area accepts pastes; `.txt` import button populates usernames cleanly. Verified: `left_panel.py`. |
+| **TSK-203** | Build Right Panel: Real-time data table with color-coded status badges | Dev 2 | `[x]` | Table renders test rows with green (Active) and red (Banned) cell highlights. Verified: `data_table.py` — rows (not individual badge cells) are tinted; see deviation #3 in the Sprint 1 & 2 progress report. |
+| **TSK-204** | Implement worker-to-UI thread-safe queue for real-time row rendering | Dev 1 | `[x]` | GUI remains fully responsive during active scraping; zero frozen window warnings. Verified: `bridge.py`, event queue drained every 100ms via `root.after()`. |
+| **TSK-205** | Implement one-time in-app setup browser launcher for checker login | Dev 1 | `[x]` | Setup button opens Chromium to IG/Threads; user logs in; session cookies persist on restart. Verified: `app.py`/`core/session.py` — shows Connected/Disconnected only, not username (see deviation #5). |
+
+> **Status as of 2026-10-07 (Claude Code review):** All 5 tasks implemented on `feature/sprint2-desktop-gui`, 58/58 automated tests pass (independently re-run), code reviewed against `rules.md` and `design.md` — no defects found. **Not yet merged into `dev`** — awaiting Huzaifah's merge decision. See `docs/memory.md` §3 for the full review log and the "Sprint 1 & 2 Progress Report" PDF for known gaps (live extraction untested without a checker account).
 
 ---
 

@@ -3,7 +3,7 @@
 ## Project Name: MetaInspector Desktop (Instagram & Threads Checker)
 **Target Platform:** Windows 10 / 11 Standalone Application (`.exe`)  
 **Development Timeline:** 15 Calendar Days  
-**Team:** 2 Developers (Collaborative Git Workflow)  
+**Team:** Partner Developer + Claude Code (implementation) | Claude Code — Owner's session (architecture & review) — see `docs/team_roles_and_workflow.md`  
 
 ---
 

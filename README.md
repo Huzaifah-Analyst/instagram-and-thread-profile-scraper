@@ -18,10 +18,11 @@ A high-performance Windows desktop application to verify account alive/banned st
 All architectural and development specifications are documented in the `docs/` folder:
 - [PRD.md](docs/PRD.md): Product Requirements Document
 - [architecture.md](docs/architecture.md): System Architecture & Concurrency Specs
-- [rules.md](docs/rules.md): 2-Developer Git Workflow & Engineering Rules
+- [rules.md](docs/rules.md): Git Workflow & Engineering Rules
 - [design.md](docs/design.md): UI/UX Theme, Colors & Component Layout
 - [tasks.md](docs/tasks.md): 15-Day Milestone Breakdown & Granular Sprints
 - [memory.md](docs/memory.md): Project Memory, Client Log & Issue History
+- [team_roles_and_workflow.md](docs/team_roles_and_workflow.md): Team Roles & Collaboration Workflow
 
 ---
 

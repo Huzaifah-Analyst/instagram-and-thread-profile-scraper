@@ -2,7 +2,7 @@
 
 ## Document: `docs/rules.md`
 **Project:** MetaInspector Desktop (Instagram & Threads Checker)  
-**Team Structure:** 2 Developers (Developer 1 & Developer 2)  
+**Team Structure:** Partner Developer + Claude Code (implementation) | Claude Code — Owner's session (architecture & review, see `docs/team_roles_and_workflow.md`)  
 **Version Control:** Git & GitHub  
 
 ---
@@ -13,9 +13,9 @@
 ```
 main (Production / Stable Releases only)
   └── dev (Active integration branch)
-        ├── feature/core-scraper
-        ├── feature/desktop-gui
-        ├── feature/sheets-exporter
+        ├── feature/sprint1-core-engine
+        ├── feature/sprint2-desktop-gui
+        ├── feature/sprint3-sheets-export
         └── fix/threads-modal-selector
 ```
 

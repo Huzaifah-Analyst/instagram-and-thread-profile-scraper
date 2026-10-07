@@ -8,6 +8,8 @@
 
 ## 1. Executive Summary & Team Structure
 
+> **2026-10-07 update:** Antigravity AI has been removed from this project. Claude Code (operating directly for Huzaifah) now performs the Lead Architect, QA & Code Reviewer role described below. See the changelog in `docs/memory.md` §3 for the handover record.
+
 This project operates on a high-velocity, three-tier collaborative model combining human leadership, autonomous AI coding, and architectural code review. This ensures rapid development while maintaining strict enterprise quality, zero security leaks, and 100% test verification.
 
 ```
@@ -18,16 +20,18 @@ This project operates on a high-velocity, three-tier collaborative model combini
                                     │ Directives & Feedback
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│               Antigravity AI (Lead Architect & Reviewer)               │
+│             Claude Code — Owner's session (Lead Architect & Reviewer)  │
 │   System Specs • Code Review • Test Verification • Sprint Roadmaps     │
 └───────────────────────────────────▲────────────────────────────────────┘
                                     │ PRs & Code Delivery
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│            Partner Developer + Claude (Implementation Lead)            │
+│       Partner Developer + Claude Code — Partner's session (Impl.)      │
 │         Autonomous Coding • Local Testing • GitHub PR Branches         │
 └────────────────────────────────────────────────────────────────────────┘
 ```
+
+Note: "Claude Code" appears on both tiers but as two separate, independently-run sessions with different jobs — one runs in Huzaifah's environment and does architecture/review/merge, the other runs in the Partner Developer's environment and does implementation. They never share context directly; the Owner's session is the bridge between them, same as before.
 
 ---
 
@@ -43,14 +47,15 @@ This project operates on a high-velocity, three-tier collaborative model combini
 
 ---
 
-### Role 2: Antigravity AI (Lead Architect, QA & Code Reviewer)
-* **Primary Scope:** System architecture, technical documentation, quality assurance, and code review.
+### Role 2: Claude Code — Lead Architect, QA & Code Reviewer (formerly Antigravity AI)
+* **Primary Scope:** System architecture, technical documentation, quality assurance, and code review — run directly inside Huzaifah's working directory.
 * **Core Responsibilities:**
   1. **System & Feature Architecture:** Designs system specifications, database schemas, concurrency models, and research reports (e.g. `PRD.md`, `architecture.md`, `API_VS_BROWSER_SCALING_FEASIBILITY.md`).
   2. **Automated Code Review:** Fetches all remote branches pushed by the partner, inspects code quality, checks PEP 8 compliance, and audits security.
   3. **Verification & Testing:** Runs automated test suites (`pytest`), validates acceptance criteria, and verifies zero-crash resilience.
   4. **Git Integration & PR Merge:** Safely merges approved feature branches into `dev`, resolves any merge conflicts, and maintains documentation logs (`tasks.md` and `memory.md`).
   5. **Sprint Directive Generation:** Formulates detailed, copy-paste ready technical prompts for the next sprint tasks.
+  6. **Documentation Audit:** Keeps every doc in `docs/` consistent with the actual code and with each other; flags and corrects drift (e.g. a spec doc describing a design that was later, deliberately, implemented differently).
 
 ---
 
@@ -78,7 +83,7 @@ Every feature and sprint in this project follows a strict 6-stage lifecycle:
          │
 [Stage 4: GitHub]    ──> Partner pushes feature branch (`feature/*`) to remote repo
          │
-[Stage 5: Architect] ──> Antigravity pulls branch, runs automated QA & security audit
+[Stage 5: Architect] ──> Claude Code (Owner's session) pulls branch, runs automated QA & security audit
          │
 [Stage 6: Integration]──> PR merged into `dev`, docs updated, next sprint begins!
 ```
@@ -156,7 +161,7 @@ feature/sprint5-exe-packaging  [QUEUED ⏳]
 | Sprint | Description | Lead | Status |
 | :--- | :--- | :---: | :---: |
 | **Sprint 1** | Backend Core Engine, Resource Blocker, Ban Linking, 5-Worker Scraper | Partner + Claude | **COMPLETED & MERGED ✅** (43/43 tests passed) |
-| **Sprint 2** | CustomTkinter Desktop GUI, Left Panel, Live Data Table, Thread-Safe Bridge | Partner + Claude | **ACTIVE / IN DEVELOPMENT 🔄** |
+| **Sprint 2** | CustomTkinter Desktop GUI, Left Panel, Live Data Table, Thread-Safe Bridge | Partner + Claude | **CODE COMPLETE, REVIEWED 🔎** (58/58 tests passed; PR awaiting Owner merge decision) |
 | **Sprint 3** | Google Sheets TSV Clipboard Exporter & SQLite Run History Database | Partner + Claude | Queued ⏳ |
 | **Sprint 4** | 100-Account Speed Calibration (4–5 min benchmark) & Rate-Limit Stress Tests | All Team | Queued ⏳ |
 | **Sprint 5** | Standalone Windows `.exe` Packaging (PyInstaller) & Client Handover | All Team | Queued ⏳ |

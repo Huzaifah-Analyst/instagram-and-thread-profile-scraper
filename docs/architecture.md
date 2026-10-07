@@ -46,7 +46,7 @@ graph TD
 
 ### 2.2 The 5-Worker Solution
 To achieve the 3.0-second effective throughput safely without triggering rate limits:
-- The `Concurrency Orchestrator` spins up **5 isolated Browser Contexts** inside a single persistent Chromium instance.
+- The `Concurrency Orchestrator` opens **1 persistent Browser Context with 5 pages** (not 5 isolated contexts as originally planned — only one persistent context can hold the logged-in checker session, so every worker page must share it; see `src/core/scraper.py` `MultiWorkerScraper._open_pages`).
 - The input username list is partitioned into 5 balanced chunks:
   $$\text{Chunk Size} = \frac{N}{5} = \frac{100}{5} = 20 \text{ accounts per worker}$$
 - Each worker processes its 20 accounts concurrently with safe human-like delays (8–12 seconds per profile).
@@ -74,7 +74,7 @@ Only essential HTML documents, JavaScript scripts, and GraphQL transparency XHR/
 
 ## 4. Cross-Platform Ban Linking Engine
 
-The Ban Linking Engine merges platform results using the following rule set:
+The Ban Linking Engine merges platform results using the following rule set. **Updated 2026-10-07** to match the actual implementation in `src/core/ban_engine.py`: a checkpoint/challenge on *our own checker session* (`session_blocked`) is deliberately excluded from the banned-states check and reported as `BLOCKED` instead of `BANNED` — otherwise a challenge on our checker account would falsely mark every target account as banned (see `docs/memory.md` §3.2, deviation #1).
 
 ```python
 class BanLinkEngine:
@@ -82,21 +82,26 @@ class BanLinkEngine:
 
     @classmethod
     def evaluate(cls, ig_status: str, threads_status: str) -> dict:
-        is_ig_banned = ig_status.lower() in cls.BANNED_STATES
-        is_threads_banned = threads_status.lower() in cls.BANNED_STATES
+        ig = cls.normalize(ig_status)
+        threads = cls.normalize(threads_status)
 
         # If either platform is banned, both are marked BANNED
-        if is_ig_banned or is_threads_banned:
-            return {
-                "composite_status": "BANNED",
-                "ig_status": "banned",
-                "threads_status": "banned"
-            }
-        
-        if ig_status == "not_found" and threads_status == "not_found":
-            return {"composite_status": "NOT_FOUND", "ig_status": "not_found", "threads_status": "not_found"}
+        if ig in cls.BANNED_STATES or threads in cls.BANNED_STATES:
+            return {"composite_status": "BANNED", "ig_status": "banned", "threads_status": "banned"}
 
-        return {"composite_status": "ACTIVE", "ig_status": ig_status, "threads_status": threads_status}
+        # The checker's OWN session was challenged — nothing about the target
+        # account can be trusted, so this must never be reported as a ban.
+        if "session_blocked" in (ig, threads):
+            return {"composite_status": "BLOCKED", "ig_status": ig, "threads_status": threads}
+
+        checked = [s for s in (ig, threads) if s != "skipped"]
+        if checked and all(s == "not_found" for s in checked):
+            return {"composite_status": "NOT_FOUND", "ig_status": ig, "threads_status": threads}
+
+        if any(s in ("active", "private") for s in checked):
+            return {"composite_status": "ACTIVE", "ig_status": ig, "threads_status": threads}
+
+        return {"composite_status": "ERROR", "ig_status": ig, "threads_status": threads}
 ```
 
 ---

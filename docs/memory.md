@@ -62,9 +62,25 @@ Both developers must record every merged Pull Request in the table below to main
 | :--- | :---: | :--- | :--- | :--- | :--- |
 | *2026-10-04* | - | Dev 1 & 2 | `main` | Team | Initial project documentation setup (`docs/` folder created with 6 standard specs). |
 | *2026-10-06* | #1 | Andleeb Hassan | `feature/sprint1-core-engine` | Lead Architect | Merged Sprint 1 core engine: resource blocker, ban engine, extractors, 5-worker scraper, 43 unit tests passing. |
-| *Pending* | #2 | Dev 2 | `feature/desktop-gui` | Dev 1 | CustomTkinter interface, live table, and mode selectors. |
-| *Pending* | #3 | Dev 2 | `feature/sheets-exporter` | Dev 1 | TSV clipboard formatter and Google Sheets copy button. |
-| *Pending* | #4 | Dev 1 | `feature/history-db` | Dev 2 | SQLite database and history viewer dialog. |
+| *Pending — reviewed 2026-10-07* | #2 | Andleeb Hassan (co-authored by Claude Opus 5.5) | `feature/sprint2-desktop-gui` | — | CustomTkinter interface (`src/gui/`), thread-safe bridge, checker-session detection (`src/core/session.py`), `pause()`/`resume()` on `MultiWorkerScraper`. 15 new tests (58 total, all passing on re-run). **Awaiting Huzaifah's merge decision — not yet merged.** |
+| *Pending* | #3 | — | `feature/sheets-exporter` | — | TSV clipboard formatter and Google Sheets copy button. |
+| *Pending* | #4 | — | `feature/history-db` | — | SQLite database and history viewer dialog. |
+
+### 3.1 Role Handover — Antigravity AI → Claude Code (2026-10-07)
+
+Antigravity AI is no longer part of this project. Huzaifah now runs **Claude Code directly** to perform the Lead Architect, QA & Code Reviewer responsibilities previously described for Antigravity AI in `docs/team_roles_and_workflow.md` (system architecture, code review, test verification, PR merges, documentation upkeep, sprint directive generation). No change to the Partner Developer + Claude implementation role, or to Huzaifah's role.
+
+### 3.2 Sprint 2 Independent Review (Claude Code, 2026-10-07)
+
+Performed in response to Huzaifah's request to take over QA after reading the "Sprint 1 & 2 Progress Report" PDF (`docs/MetaInspector Desktop — Sprint 1 & 2 Progress Report.pdf`).
+
+- **Pulled** `feature/sprint2-desktop-gui` (was not yet fetched locally — `git fetch` found it on `origin`).
+- **Installed** missing dependency (`customtkinter`, not previously installed in this environment) and **re-ran the full suite**: `pytest` → **58/58 passed** in 2.3s, matching the report's claim.
+- **Smoke-tested** the GUI directly (`python main.py`) — launches cleanly, no startup errors.
+- **Code-reviewed** every changed file (`app.py`, `bridge.py`, `theme.py`, `left_panel.py`, `data_table.py`, `status_bar.py`, `session.py`, `scraper.py` diff) against `docs/rules.md` and `docs/design.md`: type hints, docstrings, and the Cyber Dark colour tokens all match; no PEP 8 or security issues found (`session.py` correctly reads only cookie name/expiry, never the encrypted value).
+- **Verified the 5 documented spec deviations** in the progress report against the actual code — all 5 check out exactly as described (session-block → `BLOCKED` carve-out in `ban_engine.py`'s `BanLinkEngine.evaluate`; 1 persistent context + 5 pages in `scraper.py`; whole-row tinting in `data_table.py`; background-thread login call in `app.py`; Connected/Disconnected-only in `session.py`).
+- **Verdict:** Sprint 2 implementation is sound and ready to merge. Recommended merge is pending Huzaifah's explicit go-ahead (not performed automatically, since merging to `dev` and pushing affects the shared repo).
+- **Docs found stale during this review and corrected:** `docs/architecture.md` §2 (described 5 isolated browser contexts; actual implementation uses 1 persistent context with 5 pages — a documented, deliberate deviation) and §4 (`BanLinkEngine` pseudocode was missing the session-blocked carve-out that the real `src/core/ban_engine.py` implements); `docs/tasks.md` Sprint 2 rows (still showed `[ ]`); `docs/rules.md` and `docs/PRD.md` "Team" lines (still said "2 Developers", not reflecting the actual AI-paired team structure).
 
 ---
 
