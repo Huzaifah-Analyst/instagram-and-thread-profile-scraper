@@ -62,7 +62,7 @@ Both developers must record every merged Pull Request in the table below to main
 | :--- | :---: | :--- | :--- | :--- | :--- |
 | *2026-10-04* | - | Dev 1 & 2 | `main` | Team | Initial project documentation setup (`docs/` folder created with 6 standard specs). |
 | *2026-10-06* | #1 | Andleeb Hassan | `feature/sprint1-core-engine` | Lead Architect | Merged Sprint 1 core engine: resource blocker, ban engine, extractors, 5-worker scraper, 43 unit tests passing. |
-| *Pending — reviewed 2026-10-07* | #2 | Andleeb Hassan (co-authored by Claude Opus 5.5) | `feature/sprint2-desktop-gui` | — | CustomTkinter interface (`src/gui/`), thread-safe bridge, checker-session detection (`src/core/session.py`), `pause()`/`resume()` on `MultiWorkerScraper`. 15 new tests (58 total, all passing on re-run). **Awaiting Huzaifah's merge decision — not yet merged.** |
+| *2026-10-07* | #2 | Andleeb Hassan (co-authored by Claude Opus 5.5) | `feature/sprint2-desktop-gui` | Claude Code (Owner's session) | CustomTkinter interface (`src/gui/`), thread-safe bridge, checker-session detection (`src/core/session.py`), `pause()`/`resume()` on `MultiWorkerScraper`. 15 new tests (58 total). Squash-merged into `dev` after independent review (58/58 re-run) and Huzaifah's go-ahead. Feature branch pending delete (blocked by local permission classifier on `git push --delete`; safe to delete manually on GitHub). |
 | *Pending* | #3 | — | `feature/sheets-exporter` | — | TSV clipboard formatter and Google Sheets copy button. |
 | *Pending* | #4 | — | `feature/history-db` | — | SQLite database and history viewer dialog. |
 

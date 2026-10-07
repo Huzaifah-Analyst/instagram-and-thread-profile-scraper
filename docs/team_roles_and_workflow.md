@@ -161,7 +161,7 @@ feature/sprint5-exe-packaging  [QUEUED ⏳]
 | Sprint | Description | Lead | Status |
 | :--- | :--- | :---: | :---: |
 | **Sprint 1** | Backend Core Engine, Resource Blocker, Ban Linking, 5-Worker Scraper | Partner + Claude | **COMPLETED & MERGED ✅** (43/43 tests passed) |
-| **Sprint 2** | CustomTkinter Desktop GUI, Left Panel, Live Data Table, Thread-Safe Bridge | Partner + Claude | **CODE COMPLETE, REVIEWED 🔎** (58/58 tests passed; PR awaiting Owner merge decision) |
-| **Sprint 3** | Google Sheets TSV Clipboard Exporter & SQLite Run History Database | Partner + Claude | Queued ⏳ |
+| **Sprint 2** | CustomTkinter Desktop GUI, Left Panel, Live Data Table, Thread-Safe Bridge | Partner + Claude | **COMPLETED & MERGED ✅** (58/58 tests passed; squash-merged into `dev` 2026-10-07) |
+| **Sprint 3** | Google Sheets TSV Clipboard Exporter & SQLite Run History Database | Partner + Claude | **DISPATCHED 📤** (directive sent 2026-10-07) |
 | **Sprint 4** | 100-Account Speed Calibration (4–5 min benchmark) & Rate-Limit Stress Tests | All Team | Queued ⏳ |
 | **Sprint 5** | Standalone Windows `.exe` Packaging (PyInstaller) & Client Handover | All Team | Queued ⏳ |

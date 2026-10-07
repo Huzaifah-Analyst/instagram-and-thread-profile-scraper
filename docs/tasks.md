@@ -42,7 +42,7 @@
 | **TSK-204** | Implement worker-to-UI thread-safe queue for real-time row rendering | Dev 1 | `[x]` | GUI remains fully responsive during active scraping; zero frozen window warnings. Verified: `bridge.py`, event queue drained every 100ms via `root.after()`. |
 | **TSK-205** | Implement one-time in-app setup browser launcher for checker login | Dev 1 | `[x]` | Setup button opens Chromium to IG/Threads; user logs in; session cookies persist on restart. Verified: `app.py`/`core/session.py` — shows Connected/Disconnected only, not username (see deviation #5). |
 
-> **Status as of 2026-10-07 (Claude Code review):** All 5 tasks implemented on `feature/sprint2-desktop-gui`, 58/58 automated tests pass (independently re-run), code reviewed against `rules.md` and `design.md` — no defects found. **Not yet merged into `dev`** — awaiting Huzaifah's merge decision. See `docs/memory.md` §3 for the full review log and the "Sprint 1 & 2 Progress Report" PDF for known gaps (live extraction untested without a checker account).
+> **Status as of 2026-10-07:** All 5 tasks implemented, reviewed (58/58 tests, no defects found) and **merged into `dev`** (squash merge of PR #2). First live tests against real Instagram/Threads followed the merge — see `docs/memory.md` §5 for results, and `docs/ISSUE_concurrent_session_detection.md` for an open risk found during that testing (doesn't block Sprint 3, must be resolved before Sprint 4's TSK-401 benchmark).
 
 ---
 
