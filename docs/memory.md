@@ -89,3 +89,20 @@ Performed in response to Huzaifah's request to take over QA after reading the "S
 1. **Threads Inactive Profiles:** Inactive Threads profiles with zero posts often do not display the "About this profile" button. The parser must detect this and gracefully set `threads_country = N/A` without timing out.
 2. **Threads Badge Parsing:** The Threads join string typically contains both date and badge separated by a dot (e.g. `September 2026 · 100M+`). The parser splits this on `·` into `threads_date_joined` and `threads_join_badge`.
 3. **Modal Dismissal:** Always send `Escape` keypress twice after modal reading to ensure the backdrop overlay is dismissed before navigating to the next profile.
+
+---
+
+## 5. Live Testing Findings (2026-10-07, Huzaifah + Claude Code)
+
+First live tests against real Instagram/Threads with an actual checker account, run from the GUI (`feature/sprint2-desktop-gui`, Combined mode).
+
+### Test A — 1 account, solo run
+`zaifi._.302` → ACTIVE, IG country **Pakistan**, IG joined **November 2019**, Threads N/A. Confirms TSK-102 (Instagram transparency extraction) genuinely works end-to-end against the live site. 21.2s "check" time for this one account; total elapsed 30s (~9s of that is one-time Chromium/persistent-context startup, not per-account cost — don't divide 30s by 1 account).
+
+### Incident 5: Concurrent workers degrade/block extraction far faster than expected
+- **Setup:** Same checker account, 97 usernames queued, Combined mode, default 5 workers (one persistent context, 5 pages — per architecture.md §2.2).
+- **Result:** Run auto-stopped after only **10 total accounts** (not per-worker — 10 across all 5 workers combined) with "Meta challenged the checker account." 2 of the 10 were explicitly `BLOCKED` (session challenge detected). The other 8 showed composite `ACTIVE`, but **all 10 rows — including the 8 non-blocked ones — came back with Country and Joined as `N/A`**, even `zaifi._.302` (row 5), which had returned real data (Pakistan / November 2019) in Test A just minutes earlier on the same account.
+- **Interpretation:** Meta's abuse detection appears to react to **5 simultaneous requests sharing one login session**, not just total request volume. It looks like it starts degrading served page content (stripping/hiding the Options/About UI, so extraction silently fails with status still `ACTIVE`) *before* it serves an explicit checkpoint — only 2 of 10 hit the explicit challenge path. Per-account durations were also much higher and more variable under load (19.8s–57.1s) than the clean solo run (21.2s), the opposite of the speedup 5-worker concurrency was meant to buy.
+- **Risk to NFR-1 (100 accounts in 4–5 min):** Unverified and now in doubt as currently configured — a single-session, 5-parallel-page model may simply not be viable against live Meta without triggering detection well before 100 accounts. TSK-401 (speed benchmark) should not be scheduled until this is isolated.
+- **Open question, not yet isolated:** Is this concurrency-triggered (5 simultaneous pages on one session) or account-triggered (this particular disposable account is new/weak and gets flagged quickly regardless)? Needs a controlled test: same account, 1 worker, 5–10 accounts, Instagram-only mode, to see if sequential single-page requests avoid the silent-degradation pattern.
+- **Action needed:** Re-run "Setup Checker Account" (session was challenged and is now stale) before any further testing.
