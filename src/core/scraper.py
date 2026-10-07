@@ -169,14 +169,40 @@ class MultiWorkerScraper:
         self.blocker_stats: list[BlockerStats] = []
         self.stop_reason: Optional[str] = None
         self._stop = threading.Event()
+        self._resume = threading.Event()  # cleared while paused
+        self._resume.set()
         self._done = 0
         self._total = 0
 
+    @property
+    def is_paused(self) -> bool:
+        """``True`` while workers are held by ``pause()``."""
+        return not self._resume.is_set()
+
+    @property
+    def is_stopped(self) -> bool:
+        """``True`` once ``stop()`` was called or the session got blocked."""
+        return self._stop.is_set()
+
+    def pause(self) -> None:
+        """Holds every worker before its next account (thread-safe)."""
+        if not self._stop.is_set():
+            self._resume.clear()
+
+    def resume(self) -> None:
+        """Releases workers held by ``pause()`` (thread-safe)."""
+        self._resume.set()
+
     def stop(self, reason: str = "Stopped by user") -> None:
-        """Asks all workers to finish their current account and stop (thread-safe)."""
+        """Asks all workers to finish their current account and stop (thread-safe).
+
+        A scraper is single-use: create a new instance for the next run, so a
+        ``stop()`` that arrives just before ``run()`` starts is never lost.
+        """
         if not self._stop.is_set():
             self.stop_reason = reason
             self._stop.set()
+        self._resume.set()  # wake paused workers so they can exit
 
     def run(self, usernames: list[str]) -> list[dict]:
         """Blocking entry point; see ``run_async``."""
@@ -195,8 +221,6 @@ class MultiWorkerScraper:
         users = clean_usernames(usernames)
         chunks = chunk_usernames(users, self.workers)
         self._done, self._total = 0, len(users)
-        self._stop.clear()
-        self.stop_reason = None
         if not chunks:
             return []
 
@@ -233,6 +257,7 @@ class MultiWorkerScraper:
         # Stagger worker start so five pages don't hit Meta at the same instant.
         await self._interruptible_sleep(random.uniform(0, 2.0) * worker_id)
         for position, (index, username) in enumerate(items):
+            await self._wait_while_paused()
             if self._stop.is_set():
                 return
             record = await self._check_account(page, username)
@@ -279,13 +304,18 @@ class MultiWorkerScraper:
         except Exception:  # noqa: BLE001 - a broken UI callback must not kill the run
             logger.exception("Progress callback raised")
 
+    async def _wait_while_paused(self) -> None:
+        """Blocks this worker while paused; ``stop()`` also releases it."""
+        while not self._resume.is_set():
+            await asyncio.to_thread(self._resume.wait, 0.5)
+
     async def _interruptible_sleep(self, seconds: float) -> None:
         """Sleeps up to ``seconds`` but wakes immediately when ``stop()`` is called."""
         if seconds > 0:
             await asyncio.to_thread(self._stop.wait, seconds)
 
 
-async def _login_session(profile_dir: Path) -> None:
+async def login_session(profile_dir: Path) -> None:
     """Opens a visible browser on the profile dir for one-time manual login."""
     profile_dir.mkdir(parents=True, exist_ok=True)
     async with async_playwright() as pw:
@@ -294,7 +324,7 @@ async def _login_session(profile_dir: Path) -> None:
         )
         page = context.pages[0] if context.pages else await context.new_page()
         await page.goto("https://www.instagram.com/accounts/login/")
-        print("Log in to Instagram (and Threads) with the checker account, then close the browser window.")
+        logger.info("Log in to Instagram (and Threads) with the checker account, then close the browser window.")
         closed = asyncio.Event()
         context.on("close", lambda _ctx: closed.set())
         await closed.wait()
@@ -318,7 +348,7 @@ def main() -> None:
         sys.stdout.reconfigure(encoding="utf-8")
 
     if args.login:
-        asyncio.run(_login_session(args.profile))
+        asyncio.run(login_session(args.profile))
         return
 
     names = list(args.usernames)
