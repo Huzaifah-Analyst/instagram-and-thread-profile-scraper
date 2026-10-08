@@ -34,7 +34,7 @@ from src.core.ban_engine import (
     STATUS_SESSION_BLOCKED,
     BanLinkEngine,
 )
-from src.core.extractors import extract_instagram, extract_threads
+from src.core.extractors import DIAGNOSTICS, extract_instagram, extract_threads
 from src.core.resource_blocker import BlockerStats, attach_resource_blocker
 
 logger = logging.getLogger(__name__)
@@ -340,6 +340,10 @@ def main() -> None:
     parser.add_argument("--profile", type=Path, default=DEFAULT_PROFILE_DIR)
     parser.add_argument("--headed", action="store_true", help="Show the browser windows")
     parser.add_argument("--login", action="store_true", help="Open a browser for one-time login")
+    parser.add_argument("--timeout-scale", type=float, default=1.0,
+                        help="Diagnostics: multiply extractor polling timeouts (e.g. 2 = double)")
+    parser.add_argument("--debug-dir", type=Path,
+                        help="Diagnostics: save a screenshot + HTML whenever extraction fails")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -350,6 +354,9 @@ def main() -> None:
     if args.login:
         asyncio.run(login_session(args.profile))
         return
+
+    DIAGNOSTICS.timeout_scale = args.timeout_scale
+    DIAGNOSTICS.debug_dir = args.debug_dir
 
     names = list(args.usernames)
     if args.file:

@@ -14,6 +14,8 @@ import asyncio
 import logging
 import re
 import time
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -37,6 +39,29 @@ THREADS_URL = "https://www.threads.com/@{username}"
 NAVIGATION_TIMEOUT_MS = 30_000
 PAGE_READY_TIMEOUT_S = 8.0
 DIALOG_TIMEOUT_S = 8.0
+MENU_TIMEOUT_S = 4.0
+
+
+@dataclass
+class DiagnosticSettings:
+    """Knobs for the concurrency investigation (docs/ISSUE_concurrent_session_detection.md).
+
+    Attributes:
+        timeout_scale: Multiplies the page-ready, menu and dialog polling budgets.
+        debug_dir: When set, a screenshot and the page HTML are saved there each
+            time extraction fails, so the served page can be inspected.
+    """
+
+    timeout_scale: float = 1.0
+    debug_dir: Optional[Path] = None
+
+
+DIAGNOSTICS = DiagnosticSettings()
+
+
+def _budget(seconds: float) -> float:
+    """Applies ``DIAGNOSTICS.timeout_scale`` to a polling budget."""
+    return seconds * DIAGNOSTICS.timeout_scale
 POLL_INTERVAL_S = 0.25
 
 # Label lines in the transparency dialogs (compared lower-cased, exact line).
@@ -187,7 +212,7 @@ async def _open_profile(page: Page, url: str, ready_selector: str) -> str:
     except PlaywrightTimeoutError:
         logger.warning("Navigation timeout for %s, continuing with partial page", url)
 
-    deadline = time.monotonic() + PAGE_READY_TIMEOUT_S
+    deadline = time.monotonic() + _budget(PAGE_READY_TIMEOUT_S)
     body = ""
     while time.monotonic() < deadline:
         body = await _body_text(page)
@@ -218,7 +243,7 @@ async def _click_menu_item(page: Page, texts: tuple[str, ...]) -> bool:
     Returns:
         ``True`` if an item was clicked.
     """
-    deadline = time.monotonic() + 4.0
+    deadline = time.monotonic() + _budget(MENU_TIMEOUT_S)
     while time.monotonic() < deadline:
         candidates = [page.get_by_text(t, exact=True).last for t in texts]
         item = await _first_visible(candidates)
@@ -242,7 +267,7 @@ async def _poll_dialog(page: Page, container_selectors: tuple[str, ...], max_cha
         Parsed dict from ``parse_about_dialog`` (all ``None`` on timeout).
     """
     empty = {"date_joined": None, "join_badge": None, "country": None}
-    deadline = time.monotonic() + DIALOG_TIMEOUT_S
+    deadline = time.monotonic() + _budget(DIALOG_TIMEOUT_S)
     while time.monotonic() < deadline:
         for selector in container_selectors:
             dialogs = page.locator(selector)
@@ -267,6 +292,28 @@ async def _dismiss(page: Page) -> None:
             await page.keyboard.press("Escape")
         except PlaywrightError as exc:
             logger.debug("Escape press failed: %s", exc)
+
+
+async def _capture_failure(page: Page, platform: str, username: str, step: str, elapsed: float) -> None:
+    """Logs a failed step and, if enabled, saves a screenshot + HTML of the page.
+
+    Args:
+        page: Worker page at the moment of failure.
+        platform: ``ig`` or ``threads``.
+        username: Account being checked.
+        step: Short failure name, e.g. ``options_missing``.
+        elapsed: Seconds spent on this account so far.
+    """
+    logger.info("[diag] %s @%s failed at %s after %.1fs (url=%s)", platform, username, step, elapsed, page.url)
+    if DIAGNOSTICS.debug_dir is None:
+        return
+    stem = DIAGNOSTICS.debug_dir / f"{time.strftime('%H%M%S')}_{platform}_{username}_{step}"
+    try:
+        DIAGNOSTICS.debug_dir.mkdir(parents=True, exist_ok=True)
+        await page.screenshot(path=f"{stem}.png", full_page=False)
+        stem.with_suffix(".html").write_text(await page.content(), encoding="utf-8")
+    except (PlaywrightError, OSError) as exc:
+        logger.warning("[diag] could not save snapshot %s: %s", stem, exc)
 
 
 def _result(**fields: object) -> dict:
@@ -321,17 +368,20 @@ async def extract_instagram(page: Page, username: str) -> dict:
         ])
         if options is None:
             res["error"] = "IG options (...) button not found"
+            await _capture_failure(page, "ig", username, "options_missing", time.monotonic() - t0)
             return res
         await options.click()
 
         if not await _click_menu_item(page, ABOUT_IG_TEXTS):
             res["error"] = "IG 'About this account' option not found"
+            await _capture_failure(page, "ig", username, "about_missing", time.monotonic() - t0)
             return res
 
         parsed = await _poll_dialog(page, ("div[role='dialog']",))
         res.update(date_joined=parsed["date_joined"], country=parsed["country"])
         if not (parsed["date_joined"] or parsed["country"]):
             res["error"] = "IG about dialog did not load within timeout"
+            await _capture_failure(page, "ig", username, "dialog_timeout", time.monotonic() - t0)
     except PlaywrightError as exc:
         logger.warning("Instagram extraction failed for %s: %s", username, exc)
         res["error"] = f"IG error: {exc}"
@@ -403,11 +453,13 @@ async def extract_threads(page: Page, username: str) -> dict:
         if menu is None:
             # Inactive profiles often have no menu (memory.md quirk #1).
             res["error"] = "Threads profile menu not found"
+            await _capture_failure(page, "threads", username, "menu_missing", time.monotonic() - t0)
             return res
         await menu.click()
 
         if not await _click_menu_item(page, ABOUT_THREADS_TEXTS):
             res["error"] = "Threads 'About this profile' option not found"
+            await _capture_failure(page, "threads", username, "about_missing", time.monotonic() - t0)
             return res
 
         # Threads sometimes renders the panel without role=dialog; fall back to
@@ -416,6 +468,7 @@ async def extract_threads(page: Page, username: str) -> dict:
         res.update(parsed)
         if not (parsed["date_joined"] or parsed["country"]):
             res["error"] = "Threads about panel did not load within timeout"
+            await _capture_failure(page, "threads", username, "dialog_timeout", time.monotonic() - t0)
     except PlaywrightError as exc:
         logger.warning("Threads extraction failed for %s: %s", username, exc)
         res["error"] = f"Threads error: {exc}"
