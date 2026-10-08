@@ -53,25 +53,27 @@ def test_safe_cell_without_guard_keeps_text() -> None:
 
 # ---- TSK-301 Google Sheets TSV --------------------------------------------- #
 
-def test_tsv_header_matches_architecture_spec() -> None:
+def test_tsv_header_is_architecture_spec_plus_error() -> None:
     header = format_tsv([]).split("\n")[0]
-    assert header == "Username\tStatus\tIG Country\tIG Joined\tThreads Country\tThreads Joined"
+    assert header == "Username\tStatus\tIG Country\tIG Joined\tThreads Country\tThreads Joined\tError"
 
 
-def test_tsv_rows_have_six_cells_each() -> None:
-    lines = format_tsv([TURKISH, BANNED, PRIVATE]).split("\n")
+def test_tsv_rows_have_seven_cells_each() -> None:
+    failed = {**PRIVATE, "error_message": "IG options (...) button not found"}
+    lines = format_tsv([TURKISH, BANNED, failed]).split("\n")
     assert len(lines) == 4
-    assert all(len(line.split("\t")) == 6 for line in lines)
-    assert lines[1] == "elif70566\tACTIVE\tTürkiye\tEylül 2019\tTürkiye\tEkim 2023 · 100M+"
-    assert lines[2] == "bad_user\tBANNED\tN/A\tN/A\tN/A\tN/A"
+    assert all(len(line.split("\t")) == 7 for line in lines)
+    assert lines[1] == "elif70566\tACTIVE\tTürkiye\tEylül 2019\tTürkiye\tEkim 2023 · 100M+\t"
+    assert lines[2] == "bad_user\tBANNED\tN/A\tN/A\tN/A\tN/A\t"
     assert lines[3].split("\t")[1] == "PRIVATE"
+    assert lines[3].endswith("\tIG options (...) button not found")
 
 
 def test_tsv_value_with_tab_or_newline_cannot_shift_columns() -> None:
     record = {**TURKISH, "ig_country": "Tur\tkey\nX"}
     row = format_tsv([record], include_header=False)
     assert "\n" not in row
-    assert len(row.split("\t")) == 6
+    assert len(row.split("\t")) == 7
 
 
 # ---- TSK-305 CSV / Excel ---------------------------------------------------- #
@@ -100,7 +102,7 @@ def test_xlsx_columns_unicode_and_text_cells(tmp_path: Path) -> None:
     rows = [[c.value for c in row] for row in sheet.iter_rows()]
     assert rows[0] == [name for name, _ in EXPORT_COLUMNS]
     assert rows[1][:4] == ["elif70566", "ACTIVE", "Türkiye", "Eylül 2019"]
-    error_cell = sheet.cell(row=3, column=len(EXPORT_COLUMNS))
+    error_cell = sheet.cell(row=3, column=rows[0].index("Error") + 1)
     assert error_cell.value == "=1+1bell"  # control char stripped
     assert error_cell.data_type == "s"  # stored as text, never evaluated
     assert sheet.freeze_panes == "A2"

@@ -77,7 +77,14 @@ def _seconds(record: dict) -> str:
 
 Column = tuple[str, Callable[[dict], str]]
 
-# Google Sheets clipboard layout (docs/architecture.md §6).
+
+def error_text(record: dict) -> str:
+    """Why a row has no data (e.g. ``IG options (...) button not found``), or empty."""
+    return str(record.get("error_message") or "")
+
+
+# Google Sheets clipboard layout: docs/architecture.md §6 plus an Error column,
+# so a row with N/A data can be told apart from one that failed.
 SHEET_COLUMNS: tuple[Column, ...] = (
     ("Username", lambda r: str(r.get("username", ""))),
     ("Status", display_status),
@@ -85,14 +92,14 @@ SHEET_COLUMNS: tuple[Column, ...] = (
     ("IG Joined", lambda r: text_or_missing(r.get("ig_date_joined"))),
     ("Threads Country", lambda r: text_or_missing(r.get("threads_country"))),
     ("Threads Joined", threads_joined),
+    ("Error", error_text),
 )
 
-# CSV / Excel layout: the sheet columns plus diagnostics an operator needs.
+# CSV / Excel layout: the sheet columns plus per-platform status and timing.
 EXPORT_COLUMNS: tuple[Column, ...] = SHEET_COLUMNS + (
     ("IG Status", lambda r: text_or_missing(r.get("ig_status"))),
     ("Threads Status", lambda r: text_or_missing(r.get("threads_status"))),
     ("Seconds", _seconds),
-    ("Error", lambda r: r.get("error_message") or ""),
 )
 
 

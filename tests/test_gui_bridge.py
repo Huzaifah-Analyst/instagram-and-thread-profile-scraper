@@ -213,7 +213,10 @@ def test_record_to_row() -> None:
               "ig_date_joined": "Sep 2026", "threads_date_joined": "Sep 2026", "threads_badge": "100M+",
               "seconds": 2.44}
     assert record_to_row(1, record) == ("01", "@elif", "ACTIVE", "Turkey", "Sep 2026", "N/A",
-                                        "Sep 2026 · 100M+", "2.4s")
+                                        "Sep 2026 · 100M+", "2.4s", "")
+    failed = {**record, "error_message": "IG options (...) button not found"}
+    assert record_to_row(2, failed)[-1] == "IG options (...) button not found"
+    assert record_to_row(2, failed)[2] == "ACTIVE ⚠"  # visible without scrolling to the Error column
 
 
 def test_eta_and_duration() -> None:

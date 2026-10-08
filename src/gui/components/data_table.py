@@ -11,7 +11,7 @@ from tkinter import ttk
 
 import customtkinter as ctk
 
-from src.core.records import threads_joined
+from src.core.records import error_text, threads_joined
 from src.gui import theme
 
 COLUMNS = (
@@ -23,8 +23,11 @@ COLUMNS = (
     ("threads_country", "Threads Country", 110, "w"),
     ("threads_joined", "Threads Joined", 125, "w"),
     ("duration", "Duration", 65, "e"),
+    ("error", "Error", 260, "w"),
 )
 TREE_STYLE = "MetaInspector.Treeview"
+# Flags rows whose Error column (far right) explains missing data.
+WARNING_MARK = "⚠"
 
 
 def record_to_row(position: int, record: dict) -> tuple[str, ...]:
@@ -41,12 +44,13 @@ def record_to_row(position: int, record: dict) -> tuple[str, ...]:
     return (
         f"{position:02d}",
         f"@{record.get('username', '')}",
-        theme.display_status(record),
+        theme.display_status(record) + (f" {WARNING_MARK}" if error_text(record) else ""),
         theme.cell(record.get("ig_country")),
         theme.cell(record.get("ig_date_joined")),
         theme.cell(record.get("threads_country")),
         threads_joined(record),
         "N/A" if seconds is None else f"{float(seconds):.1f}s",  # history runs store no timing
+        error_text(record),
     )
 
 
@@ -76,14 +80,17 @@ class DataTable(ctk.CTkFrame):
                                  style=TREE_STYLE, selectmode="extended")
         for key, title, width, anchor in COLUMNS:
             self.tree.heading(key, text=title, anchor=anchor)
-            self.tree.column(key, width=width, minwidth=40, anchor=anchor, stretch=key != "idx")
+            self.tree.column(key, width=width, minwidth=40, anchor=anchor, stretch=key not in ("idx", "error"))
         for status, (fg, bg) in theme.STATUS_COLORS.items():
             self.tree.tag_configure(status, foreground=fg, background=bg)
 
         scrollbar = ctk.CTkScrollbar(self, command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scrollbar.set)
-        self.tree.grid(row=1, column=0, sticky="nsew", padx=(14, 0), pady=(0, 14))
-        scrollbar.grid(row=1, column=1, sticky="ns", padx=(2, 8), pady=(0, 14))
+        h_scrollbar = ctk.CTkScrollbar(self, orientation="horizontal", command=self.tree.xview)
+        self.tree.configure(yscrollcommand=scrollbar.set, xscrollcommand=h_scrollbar.set)
+        self.tree.grid(row=1, column=0, sticky="nsew", padx=(14, 0))
+        scrollbar.grid(row=1, column=1, sticky="ns", padx=(2, 8))
+        # The Error column can be long; scroll sideways rather than squeeze the data columns.
+        h_scrollbar.grid(row=2, column=0, sticky="ew", padx=(14, 0), pady=(2, 10))
 
         self._counts: dict[str, int] = {}
         self.records: list[dict] = []
@@ -108,7 +115,7 @@ class DataTable(ctk.CTkFrame):
         """Appends one finished account and scrolls it into view."""
         self.records.append(record)
         values = record_to_row(len(self.records), record)
-        status = values[2]
+        status = theme.display_status(record)  # values[2] may carry the warning mark
         item = self.tree.insert("", "end", values=values, tags=(status,))
         self.tree.see(item)
         self._counts[status] = self._counts.get(status, 0) + 1
