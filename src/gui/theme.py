@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from src.core import records
+
 BG_DARK = "#121214"
 BG_SURFACE = "#1A1A1E"
 BG_ELEVATED = "#24242A"
@@ -28,6 +30,8 @@ FONT_CAPTION = (FONT_FAMILY, 11)
 TTK_FONT_BODY = (FONT_FAMILY, -13)
 TTK_FONT_HEADING = (FONT_FAMILY, -12, "bold")
 
+MODE_LABELS = {"combined": "Combined", "ig_only": "Instagram Only", "threads_only": "Threads Only"}
+
 WINDOW_SIZE = (1150, 750)
 WINDOW_MIN_SIZE = (950, 600)
 LEFT_PANEL_WIDTH = 320
@@ -43,23 +47,9 @@ STATUS_COLORS: dict[str, tuple[str, str]] = {
 }
 
 
-def display_status(record: dict) -> str:
-    """Maps a scraper record to the label shown in the Status column.
-
-    A private Instagram account is composite ``ACTIVE`` in the engine, but the
-    UI shows it as ``PRIVATE`` (amber) per the design spec.
-    """
-    status = record.get("composite_status") or "ERROR"
-    if status == "ACTIVE" and record.get("ig_status") == "private":
-        return "PRIVATE"
-    return status
-
-
-def cell(value: Optional[object]) -> str:
-    """Formats an optional value for a table cell (``None`` -> ``N/A``)."""
-    if value is None or value == "":
-        return "N/A"
-    return str(value)
+# Kept as GUI-facing names; the logic is shared with the exporters in src/core/records.py.
+display_status = records.display_status
+cell = records.text_or_missing
 
 
 def format_duration(seconds: float) -> str:

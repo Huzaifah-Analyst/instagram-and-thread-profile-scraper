@@ -1,20 +1,25 @@
-"""Main MetaInspector Desktop window (TSK-201) wiring the panels to the engine."""
+"""Main MetaInspector Desktop window (TSK-201) wiring the panels to the engine and history."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import sqlite3
 import threading
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 
 import customtkinter as ctk
 
-from src.core.scraper import MODE_COMBINED, MODE_IG_ONLY, MultiWorkerScraper, login_session
+from src.core.history_db import HistoryDB
+from src.core.scraper import MODE_COMBINED, MultiWorkerScraper, login_session
 from src.core.session import SESSION_CONNECTED, SESSION_UNKNOWN, check_session
 from src.gui import theme
+from src.gui.actions import copy_to_clipboard, export_records
 from src.gui.bridge import ErrorEvent, FinishedEvent, ProgressEvent, RunState, ScraperBridge, ScraperFactory
 from src.gui.components.data_table import DataTable
+from src.gui.components.history_dialog import HistoryDialog
 from src.gui.components.left_panel import LeftPanel
 from src.gui.components.status_bar import StatusBar
 
@@ -22,21 +27,23 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PROFILE_DIR = PROJECT_ROOT / "browser_profile"
+DEFAULT_HISTORY_PATH = PROJECT_ROOT / "history.db"
 POLL_INTERVAL_MS = 100
-MODE_NAMES = {MODE_COMBINED: "Combined", MODE_IG_ONLY: "Instagram Only"}
 
 
 class MetaInspectorApp(ctk.CTk):
     """Top-level window: header, left control panel, live table, status bar."""
 
     def __init__(self, profile_dir: Path = DEFAULT_PROFILE_DIR,
-                 scraper_factory: Optional[ScraperFactory] = None) -> None:
+                 scraper_factory: Optional[ScraperFactory] = None,
+                 history_path: Path = DEFAULT_HISTORY_PATH) -> None:
         """Builds the window.
 
         Args:
             profile_dir: Chromium profile holding the checker login.
             scraper_factory: Override for tests; defaults to a headless
                 ``MultiWorkerScraper`` on ``profile_dir``.
+            history_path: SQLite file for run history (created if missing).
         """
         ctk.set_appearance_mode("dark")
         super().__init__(fg_color=theme.BG_DARK)
@@ -52,6 +59,16 @@ class MetaInspectorApp(ctk.CTk):
         self._login_error: Optional[str] = None
         self._total = 0
         self._done = 0
+        self._run_mode = MODE_COMBINED
+        self._run_started = datetime.now()
+        self._history_dialog: Optional[HistoryDialog] = None
+        self._history_error: Optional[str] = None
+        try:
+            self.history: Optional[HistoryDB] = HistoryDB(history_path)
+        except (sqlite3.Error, OSError) as exc:
+            logger.error("History database unavailable at %s: %s", history_path, exc)
+            self.history = None
+            self._history_error = str(exc)
 
         self._build_header()
         self.left_panel = LeftPanel(self, on_start=self._on_start, on_pause_toggle=self._on_pause_toggle,
@@ -59,13 +76,16 @@ class MetaInspectorApp(ctk.CTk):
         self.left_panel.grid(row=1, column=0, sticky="nsw")
         self.table = DataTable(self)
         self.table.grid(row=1, column=1, sticky="nsew", padx=14, pady=14)
-        self.status_bar = StatusBar(self)
+        self.status_bar = StatusBar(self, on_copy=self._on_copy, on_export_csv=lambda: self._on_export("csv"),
+                                    on_export_xlsx=lambda: self._on_export("xlsx"), on_history=self._on_history)
         self.status_bar.grid(row=2, column=0, columnspan=2, sticky="ew")
+        if self._history_error:
+            self.status_bar.message(f"Run history unavailable: {self._history_error}", "error")
 
         self._refresh_session()
         self._apply_state()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
-        self.after(POLL_INTERVAL_MS, self._poll)
+        self._poll_job = self.after(POLL_INTERVAL_MS, self._poll)
 
     # ------------------------------------------------------------------ #
     # Layout
@@ -105,8 +125,9 @@ class MetaInspectorApp(ctk.CTk):
         self.status_bar.set_progress(0, self._total)
         self.status_bar.set_timing(0, None)
         mode = self.left_panel.mode
+        self._run_mode, self._run_started = mode, datetime.now()
         self.bridge.start(usernames, mode)
-        self.status_bar.message(f"Checking {self._total} accounts ({MODE_NAMES.get(mode, 'Threads Only')})...")
+        self.status_bar.message(f"Checking {self._total} accounts ({theme.MODE_LABELS[mode]})...")
         self._apply_state()
 
     def _on_pause_toggle(self) -> None:
@@ -124,6 +145,26 @@ class MetaInspectorApp(ctk.CTk):
         self.bridge.stop()
         self.status_bar.message("Stopping after the current accounts finish...", "warn")
         self._apply_state()
+
+    def _on_copy(self) -> None:
+        """Copies the current results for Google Sheets (TSK-301/302)."""
+        if copy_to_clipboard(self, self.table.records):
+            self.status_bar.flash_copied()
+
+    def _on_export(self, kind: str) -> None:
+        """Exports the current results as CSV or Excel (TSK-305)."""
+        export_records(self, self.table.records, kind)
+
+    def _on_history(self) -> None:
+        """Opens (or focuses) the Run History viewer (TSK-304)."""
+        if self.history is None:
+            self.status_bar.message(f"Run history unavailable: {self._history_error}", "error")
+            return
+        if self._history_dialog is not None and self._history_dialog.winfo_exists():
+            self._history_dialog.refresh()
+            self._history_dialog.focus()
+            return
+        self._history_dialog = HistoryDialog(self, self.history)
 
     def _on_setup(self) -> None:
         """Opens a visible browser for one-time checker login (TSK-205)."""
@@ -178,12 +219,13 @@ class MetaInspectorApp(ctk.CTk):
             self._refresh_session()
             self._apply_state()
 
-        self.after(POLL_INTERVAL_MS, self._poll)
+        self._poll_job = self.after(POLL_INTERVAL_MS, self._poll)
 
     def _on_finished(self, event: FinishedEvent) -> None:
-        """Shows the end-of-run summary."""
+        """Saves the run to history (TSK-303) and shows the end-of-run summary."""
         self.status_bar.set_timing(event.elapsed, 0)
         checked = len(event.records)
+        self._save_run(event)
         if event.stop_reason and "session blocked" in event.stop_reason.lower():
             self.status_bar.message(
                 f"Stopped after {checked} accounts: Meta challenged the checker account. "
@@ -195,12 +237,28 @@ class MetaInspectorApp(ctk.CTk):
             self.status_bar.message(
                 f"Done: {checked} accounts in {theme.format_duration(event.elapsed)}.", "success")
 
+    def _save_run(self, event: FinishedEvent) -> None:
+        """Persists a finished (or stopped) run; failures are shown, never raised."""
+        if self.history is None or not event.records:
+            return
+        try:
+            run_id = self.history.save_run(event.records, self._run_mode, self._total, event.elapsed,
+                                           created_at=self._run_started)
+        except sqlite3.Error as exc:
+            logger.error("Could not save run to history: %s", exc)
+            self.status_bar.message(f"Run finished but could not be saved to history: {exc}", "error")
+            return
+        logger.info("Saved %s (%d accounts) to history", run_id, len(event.records))
+        if self._history_dialog is not None and self._history_dialog.winfo_exists():
+            self._history_dialog.refresh()
+
     def _apply_state(self) -> None:
         """Syncs button states with the bridge and login status."""
         login = self._login_running
         self.left_panel.apply_state(self.bridge.state, start_allowed=not login)
         busy = login or self.bridge.state is not RunState.IDLE
         self.setup_button.configure(state="disabled" if busy else "normal")
+        self.status_bar.set_results_available(bool(self.table.records))
 
     def _refresh_session(self) -> None:
         """Updates the header session indicator."""
@@ -212,6 +270,11 @@ class MetaInspectorApp(ctk.CTk):
         else:
             text, color = f"●  Disconnected ({detail}) — click Setup", theme.STATUS_BANNED
         self._session_label.configure(text=text, text_color=color)
+
+    def destroy(self) -> None:
+        """Cancels the poll timer so no callback fires on a destroyed window."""
+        self.after_cancel(self._poll_job)
+        super().destroy()
 
     def _on_close(self) -> None:
         """Stops any run before closing the window."""
