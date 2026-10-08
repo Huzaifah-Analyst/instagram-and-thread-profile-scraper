@@ -23,7 +23,7 @@ All architectural and development specifications are documented in the `docs/` f
 - [tasks.md](docs/tasks.md): 15-Day Milestone Breakdown & Granular Sprints
 - [memory.md](docs/memory.md): Project Memory, Client Log & Issue History
 - [team_roles_and_workflow.md](docs/team_roles_and_workflow.md): Team Roles & Collaboration Workflow
-- [ISSUE_concurrent_session_detection.md](docs/ISSUE_concurrent_session_detection.md): Open issue — live testing risk, read before Sprint 4
+- [ISSUE_concurrent_session_detection.md](docs/ISSUE_concurrent_session_detection.md): Open issue, live testing risk, read before Sprint 4
 
 ---
 
