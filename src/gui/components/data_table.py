@@ -11,6 +11,7 @@ from tkinter import ttk
 
 import customtkinter as ctk
 
+from src.core.records import threads_joined
 from src.gui import theme
 
 COLUMNS = (
@@ -23,7 +24,7 @@ COLUMNS = (
     ("threads_joined", "Threads Joined", 125, "w"),
     ("duration", "Duration", 65, "e"),
 )
-_STYLE = "MetaInspector.Treeview"
+TREE_STYLE = "MetaInspector.Treeview"
 
 
 def record_to_row(position: int, record: dict) -> tuple[str, ...]:
@@ -36,9 +37,7 @@ def record_to_row(position: int, record: dict) -> tuple[str, ...]:
     Returns:
         Cell values in ``COLUMNS`` order.
     """
-    joined = theme.cell(record.get("threads_date_joined"))
-    if record.get("threads_badge"):
-        joined = f"{joined} · {record['threads_badge']}"
+    seconds = record.get("seconds")
     return (
         f"{position:02d}",
         f"@{record.get('username', '')}",
@@ -46,30 +45,35 @@ def record_to_row(position: int, record: dict) -> tuple[str, ...]:
         theme.cell(record.get("ig_country")),
         theme.cell(record.get("ig_date_joined")),
         theme.cell(record.get("threads_country")),
-        joined,
-        f"{float(record.get('seconds') or 0):.1f}s",
+        threads_joined(record),
+        "N/A" if seconds is None else f"{float(seconds):.1f}s",  # history runs store no timing
     )
 
 
 class DataTable(ctk.CTkFrame):
     """Scrollable, colour-coded results grid."""
 
-    def __init__(self, master: ctk.CTkBaseClass) -> None:
-        """Builds the table inside a surface-coloured frame."""
+    def __init__(self, master: ctk.CTkBaseClass, title: str = "Live Results") -> None:
+        """Builds the table inside a surface-coloured frame.
+
+        Args:
+            master: Parent widget.
+            title: Heading shown above the table.
+        """
         super().__init__(master, fg_color=theme.BG_SURFACE, corner_radius=8)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=14, pady=(12, 8))
-        ctk.CTkLabel(header, text="Live Results", font=theme.FONT_SECTION,
+        ctk.CTkLabel(header, text=title, font=theme.FONT_SECTION,
                      text_color=theme.TEXT_PRIMARY).pack(side="left")
         self._summary = ctk.CTkLabel(header, text="", font=theme.FONT_CAPTION, text_color=theme.TEXT_MUTED)
         self._summary.pack(side="right")
 
         self._configure_style()
         self.tree = ttk.Treeview(self, columns=[c[0] for c in COLUMNS], show="headings",
-                                 style=_STYLE, selectmode="extended")
+                                 style=TREE_STYLE, selectmode="extended")
         for key, title, width, anchor in COLUMNS:
             self.tree.heading(key, text=title, anchor=anchor)
             self.tree.column(key, width=width, minwidth=40, anchor=anchor, stretch=key != "idx")
@@ -91,6 +95,15 @@ class DataTable(ctk.CTkFrame):
         self._counts.clear()
         self._summary.configure(text="")
 
+    def set_records(self, records: list[dict]) -> None:
+        """Replaces the table contents (used by the history viewer)."""
+        self.clear()
+        for record in records:
+            self.add_record(record)
+        children = self.tree.get_children()
+        if children:
+            self.tree.see(children[0])
+
     def add_record(self, record: dict) -> None:
         """Appends one finished account and scrolls it into view."""
         self.records.append(record)
@@ -105,11 +118,11 @@ class DataTable(ctk.CTkFrame):
         """Applies the Cyber Dark palette to the ttk Treeview."""
         style = ttk.Style(self)
         style.theme_use("clam")  # the only built-in theme that honours custom colours
-        style.configure(_STYLE, background=theme.BG_ELEVATED, fieldbackground=theme.BG_ELEVATED,
+        style.configure(TREE_STYLE, background=theme.BG_ELEVATED, fieldbackground=theme.BG_ELEVATED,
                         foreground=theme.TEXT_PRIMARY, rowheight=30, borderwidth=0, font=theme.TTK_FONT_BODY)
-        style.configure(f"{_STYLE}.Heading", background=theme.BG_DARK, foreground=theme.TEXT_MUTED,
+        style.configure(f"{TREE_STYLE}.Heading", background=theme.BG_DARK, foreground=theme.TEXT_MUTED,
                         relief="flat", borderwidth=0, font=theme.TTK_FONT_HEADING)
-        style.map(f"{_STYLE}.Heading", background=[("active", theme.BORDER_COLOR)])
-        style.map(_STYLE, background=[("selected", theme.ACCENT_HOVER)],
+        style.map(f"{TREE_STYLE}.Heading", background=[("active", theme.BORDER_COLOR)])
+        style.map(TREE_STYLE, background=[("selected", theme.ACCENT_HOVER)],
                   foreground=[("selected", theme.TEXT_PRIMARY)])
-        style.layout(_STYLE, [("Treeview.treearea", {"sticky": tk.NSEW})])  # drop the light border
+        style.layout(TREE_STYLE, [("Treeview.treearea", {"sticky": tk.NSEW})])  # drop the light border

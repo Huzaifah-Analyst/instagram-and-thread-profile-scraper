@@ -1,19 +1,39 @@
-"""Bottom status bar: progress, elapsed time, ETA and messages."""
+"""Bottom action bar: progress, elapsed time, ETA, messages and result actions."""
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Callable, Optional
 
 import customtkinter as ctk
 
 from src.gui import theme
 
 
-class StatusBar(ctk.CTkFrame):
-    """Shows run progress and a single-line status message."""
+COPY_LABEL = "📋  Copy for Google Sheets"
+COPIED_LABEL = "✓  Copied!"
+COPIED_FEEDBACK_MS = 2000
 
-    def __init__(self, master: ctk.CTkBaseClass) -> None:
-        """Builds the progress bar and labels."""
+
+class StatusBar(ctk.CTkFrame):
+    """Shows run progress, a status message and the copy/export/history actions."""
+
+    def __init__(
+        self,
+        master: ctk.CTkBaseClass,
+        on_copy: Callable[[], None],
+        on_export_csv: Callable[[], None],
+        on_export_xlsx: Callable[[], None],
+        on_history: Callable[[], None],
+    ) -> None:
+        """Builds the progress row, message line and action buttons.
+
+        Args:
+            master: Parent widget.
+            on_copy: "Copy for Google Sheets" handler.
+            on_export_csv: "Export CSV" handler.
+            on_export_xlsx: "Export Excel" handler.
+            on_history: "View Run History" handler.
+        """
         super().__init__(master, fg_color=theme.BG_SURFACE, corner_radius=0, height=64)
         self.grid_columnconfigure(1, weight=1)
 
@@ -31,7 +51,35 @@ class StatusBar(ctk.CTkFrame):
 
         self._message = ctk.CTkLabel(self, text="Ready. Paste usernames and press Start.",
                                      font=theme.FONT_CAPTION, text_color=theme.TEXT_MUTED, anchor="w")
-        self._message.grid(row=1, column=0, columnspan=4, sticky="ew", padx=16, pady=(0, 10))
+        self._message.grid(row=1, column=0, columnspan=4, sticky="ew", padx=16, pady=(0, 6))
+
+        actions = ctk.CTkFrame(self, fg_color="transparent")
+        actions.grid(row=2, column=0, columnspan=4, sticky="ew", padx=16, pady=(0, 12))
+        self.copy_button = ctk.CTkButton(actions, text=COPY_LABEL, command=on_copy, width=210,
+                                         fg_color=theme.ACCENT_BLUE, hover_color=theme.ACCENT_HOVER,
+                                         font=theme.FONT_BODY)
+        self.copy_button.pack(side="left")
+        secondary = {"fg_color": theme.BG_ELEVATED, "hover_color": theme.BORDER_COLOR, "font": theme.FONT_BODY}
+        self.csv_button = ctk.CTkButton(actions, text="Export CSV", width=110, command=on_export_csv, **secondary)
+        self.csv_button.pack(side="left", padx=(8, 0))
+        self.xlsx_button = ctk.CTkButton(actions, text="Export Excel", width=110, command=on_export_xlsx,
+                                         **secondary)
+        self.xlsx_button.pack(side="left", padx=(8, 0))
+        self.history_button = ctk.CTkButton(actions, text="📜  View Run History", width=160,
+                                            command=on_history, **secondary)
+        self.history_button.pack(side="left", padx=(8, 0))
+        self.set_results_available(False)
+
+    def set_results_available(self, available: bool) -> None:
+        """Enables the copy/export buttons only when there are results to act on."""
+        state = "normal" if available else "disabled"
+        for button in (self.copy_button, self.csv_button, self.xlsx_button):
+            button.configure(state=state)
+
+    def flash_copied(self) -> None:
+        """Shows "Copied!" on the copy button for 2 seconds (design.md §5)."""
+        self.copy_button.configure(text=COPIED_LABEL)
+        self.after(COPIED_FEEDBACK_MS, lambda: self.copy_button.configure(text=COPY_LABEL))
 
     def set_progress(self, done: int, total: int) -> None:
         """Updates the bar and the ``done/total (pct)`` label."""

@@ -230,7 +230,8 @@ def test_app_runs_a_fake_check_end_to_end(tmp_path: Path) -> None:
     from src.gui.app import MetaInspectorApp
 
     try:
-        app = MetaInspectorApp(profile_dir=tmp_path, scraper_factory=lambda mode, cb: FakeScraper(mode, cb))
+        app = MetaInspectorApp(profile_dir=tmp_path, scraper_factory=lambda mode, cb: FakeScraper(mode, cb),
+                               history_path=tmp_path / "history.db")
     except tk.TclError as exc:
         pytest.skip(f"No display available: {exc}")
     try:
