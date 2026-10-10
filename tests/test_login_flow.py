@@ -150,3 +150,71 @@ def test_threads_continue_existing_account_without_signup() -> None:
         assert result.ready
         assert await page.evaluate("window.signup === undefined")
     browser_case(check)
+
+
+@pytest.mark.parametrize("field", [
+    '<label for="otp">Code</label><input id="otp">',
+    '<input name="approvals_code">',
+    '<input aria-label="Code">',
+    '<input inputmode="numeric" maxlength="6">',
+])
+def test_current_authenticator_screen_and_scoped_submit(
+    monkeypatch: pytest.MonkeyPatch, field: str,
+) -> None:
+    """The screenshot's Code field works below the fold without clicking outer Log in."""
+    monkeypatch.setattr("src.core.login_flow.time.time", lambda: 1234567890)
+    async def check(page: Page) -> None:
+        """Use the observed heading, synthetic field variants and an unrelated button."""
+        html = '''<button onclick="window.wrong=true">Log in</button><div role="dialog">
+          <h1>Go to your authentication app</h1>
+          <p>Enter the 6-digit code for this account from the two-factor authentication app you set up.</p>
+          <div style="height:1200px"></div>''' + field + '''
+          <label><input type="checkbox" checked>Trust this device and skip this step from now on</label>
+          <button onclick="finish()">Continue</button></div>
+          <script>function finish(){window.otp=document.querySelector('input:not([type=checkbox])').value;
+          document.cookie='sessionid=fake; path=/'; document.body.innerHTML='<a href="/alice/">Profile</a>';}</script>'''
+        await page.route("**/*", lambda route: route.fulfill(body=html, content_type="text/html; charset=utf-8"))
+        result = await login_platform(page, "ig", ACCOUNT, threading.Event(), 4)
+        assert result.ready
+        assert await page.evaluate("window.otp") == "005924"
+        assert await page.evaluate("window.wrong === undefined")
+    browser_case(check)
+
+
+def test_code_label_on_email_prompt_never_gets_authenticator_code() -> None:
+    """A generic Code label alone is not evidence of an authenticator challenge."""
+    async def check(page: Page) -> None:
+        """Leave the email code empty, even if the page mentions other methods."""
+        html = '''<p>We sent a code to your email. You can also use an authentication app.</p>
+          <label for="otp">Code</label><input id="otp"><button>Continue</button>'''
+        await page.route("**/*", lambda route: route.fulfill(body=html, content_type="text/html"))
+        result = await login_platform(page, "ig", ACCOUNT, threading.Event(), .6)
+        assert not result.ready
+        assert await page.locator("input").input_value() == ""
+    browser_case(check)
+
+
+def test_threads_resumes_after_instagram_authenticator_handoff(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An IG feed after 2FA must return to Threads and verify its separate session."""
+    monkeypatch.setattr("src.core.login_flow.time.time", lambda: 1234567890)
+    async def check(page: Page) -> None:
+        """Route a Threads-to-IG handoff locally; no real websites or credentials."""
+        visits = 0
+        async def route_page(route: object) -> None:
+            """Emulate one handoff and a completed Threads login on return."""
+            nonlocal visits
+            if "threads.com" in route.request.url:
+                visits += 1
+                html = ('<script>location.href="https://www.instagram.com/accounts/login/two_step_verification"</script>'
+                        if visits == 1 else '<a href="/@alice">Profile</a><script>document.cookie="sessionid=fake; path=/"</script>')
+            else:
+                html = '''<h1>Go to your authentication app</h1>
+                  <label for="otp">Code</label><input id="otp"><button onclick="finish()">Continue</button>
+                  <script>function finish(){document.cookie='sessionid=fake; path=/';
+                  document.body.innerHTML='<a href="/alice/">Profile</a>';}</script>'''
+            await route.fulfill(body=html, content_type="text/html")
+        await page.route("**/*", route_page)
+        outcome = await login_platform(page, "threads", ACCOUNT, threading.Event(), 5)
+        assert outcome.ready and visits == 2
+        assert "threads.com" in page.url
+    browser_case(check)

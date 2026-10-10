@@ -298,3 +298,15 @@ Setup stopped before the other four accounts. P36 remains open for manual
 completion/diagnosis, and all five dual-platform logins are not claimed.
 See [account-file-auto-login.md](implementation/account-file-auto-login.md) and
 [manual_verification.md](manual_verification.md); P33-P36 track this work.
+
+### 2026-10-10 - Authenticator Code screen follow-up
+
+The operator requested automatic completion of the pictured authentication-app
+Code prompt. Added label/ARIA/approvals_code and autocomplete-token field support,
+form/dialog-scoped submit selection, and a bounded return to Threads when its IG
+authentication handoff ends at Instagram. Codes still come from the imported seed
+locally and are submitted at most once; no secret logging was added. **159 tests
+passed in 35.94s**, including below-fold Code/Continue controls and handoff fixtures.
+Live validation is pending browser closure; the screenshot provides visible text,
+not DOM attributes. P37 tracks the fix; P36 is not declared live-resolved.
+See [authenticator-code-form.md](implementation/authenticator-code-form.md).

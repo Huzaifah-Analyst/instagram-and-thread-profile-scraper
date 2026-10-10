@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 from playwright.async_api import Locator, Page
 
 from src.core.credentials import AccountCredential
+from src.core.authenticator_form import authenticator_field, authenticator_submit
 from src.core.totp import totp_code
 
 HOSTS = {
@@ -112,19 +113,18 @@ async def _login_platform(
     await page.goto(LOGIN_URLS[platform], wait_until="domcontentloaded", timeout=30_000)
     deadline = time.monotonic() + timeout_s
     password_sent = otp_sent = continue_sent = False
+    returned_to_threads = False
     dismissed: set[str] = set()
     while time.monotonic() < deadline and not cancel.is_set():
         if not official_url(page.url):
             return LoginOutcome(platform, False, "Unexpected login destination; manual review needed.")
         body = (await page.locator("body").inner_text(timeout=3000)).lower()
         path = urlsplit(page.url).path.lower()
-        otp_input = await visible(page.locator(
-            'input[name="verificationCode"], input[name="verification_code"], '
-            'input[name="security_code"], input[autocomplete="one-time-code"]'
-        ))
-        authenticator = otp_input is not None and any(word in body for word in (
+        app_prompt = any(word in body for word in (
             "authentication app", "authenticator app", "authentication code", "authenticator code",
         )) and not any(word in body for word in ("sent a code", "text message", "sent to your email"))
+        otp_input = await authenticator_field(page, allow_label=app_prompt)
+        authenticator = otp_input is not None and app_prompt
         if (any(part in path for part in ("/checkpoint", "/captcha"))
                 or ("/challenge" in path and not authenticator)
                 or any(word in body for word in (
@@ -140,6 +140,13 @@ async def _login_platform(
             return LoginOutcome(platform, False, "Login or 2FA was rejected; check account details and device time.")
         if await identity_matches(page, platform, credential.username):
             return LoginOutcome(platform, True, "Login verified for the imported account.")
+        if (platform == "threads" and not returned_to_threads
+                and await identity_matches(page, "ig", credential.username)):
+            # An Instagram 2FA handoff may finish at Instagram's own feed.
+            # Continue to Threads once; IG cookies alone never prove Threads login.
+            returned_to_threads = True
+            await page.goto(LOGIN_URLS["threads"], wait_until="domcontentloaded", timeout=30_000)
+            continue
         if authenticator and not otp_sent:
             # Avoid submitting a code with only a few seconds of validity left.
             if time.time() % 30 > 25:
@@ -147,10 +154,14 @@ async def _login_platform(
                 continue
             if not official_url(page.url):
                 continue
-            await otp_input.fill(totp_code(credential.totp_secret), timeout=3000)
-            otp_sent = True
-            if not await click_named(page, r"^(confirm|continue|log in|verify|submit)$"):
+            submit = await authenticator_submit(otp_input)
+            if submit is None:
                 return LoginOutcome(platform, False, "2FA submit control not recognized; finish in browser.")
+            await otp_input.fill(totp_code(credential.totp_secret), timeout=3000)
+            if not official_url(page.url) or cancel.is_set():
+                continue
+            await submit.click(timeout=3000)
+            otp_sent = True
         elif otp_input is not None and not authenticator:
             return LoginOutcome(platform, False, "Email/SMS or unrecognized verification needs manual entry.")
         elif not password_sent:

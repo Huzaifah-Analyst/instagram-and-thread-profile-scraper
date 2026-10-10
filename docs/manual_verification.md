@@ -30,6 +30,9 @@ restarted. The existing `dist` executable has not been rebuilt with these change
 3. Watch the status bar and visible browser. Each account signs into Instagram
    then Threads in its own profile. Password/2FA values are not shown in app logs.
    Browser setup is sequential; target checks can later run across five profiles.
+   On **Go to your authentication app**, the **Code** field and Continue button
+   are handled automatically by the import flow. The separate **Login IG +
+   Threads** button opens the manual-login flow and does not load file credentials.
 4. If Meta asks for a checkpoint, CAPTCHA, email/SMS code or an unfamiliar step,
    finish it manually in that browser, then close the browser and reimport the
    same file. Setup stops at that account; later accounts are not attempted.

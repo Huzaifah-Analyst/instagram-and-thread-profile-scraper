@@ -39,7 +39,10 @@ updated states. Reports: [checker pool](implementation/isolated-checker-pool.md)
 - First imported account passed live Instagram auto-login after a current-form
   selector fix (P35). Threads remained unverified after its authenticator step;
   setup stopped before the other four accounts (P36).
-- **Latest full suite: 153 passed in 26.68s, zero skips**, outside the sandbox.
+- The current authenticator screen's Code control now has label/ARIA/modern-name
+  fallbacks and scoped submission (P37). A bounded IG-to-Threads return is also
+  implemented; fresh live acceptance of this follow-up remains pending.
+- **Latest full suite: 159 passed in 35.94s, zero skips**, outside the sandbox.
   This includes real Tk widgets and real local Chromium DOM tests. Earlier Tcl
   environment failures and approval timeouts remain in the running test log.
 
@@ -173,3 +176,4 @@ individual test runs in test_log.md and task-method reports under implementation
 | P34 | Preventive fix / automated coverage passes | Assigning imported sessions by slot number would mix accounts after a reordered import. Profile directories now follow stable username bindings; matching identity is required during setup and extraction preflight. Existing manual profiles are preserved. |
 | P35 | Fixed / live IG login verified | First automatic attempt could not find the current IG username field: `name=email`, `autocomplete=username webauthn`. Read-only control inspection pinpointed the mismatch. Added email-name and autocomplete-token selectors; next live attempt verified the first account on IG. See [report](implementation/account-file-auto-login.md). |
 | P36 | Open / live Threads authentication unverified | After IG succeeded, Threads submitted one authenticator code but no matching authenticated session was verified before timeout. Fresh read-only inspection still showed a login form and no Threads session cookie. It did not show an incorrect-code marker, so rejection, extra verification, or UI progression cannot yet be distinguished. Setup halted with 0/5 dual-platform accounts verified. Complete the first account manually in Setup and reimport; do not count the other four as tested. |
+| P37 | Implemented / synthetic regressions pass; live acceptance pending | User screenshot shows an empty Code field on an explicit authentication-app screen. Prior selectors lacked label/ARIA/approvals_code fallbacks, and page-wide submit selection could choose an unrelated login button. Added explicit-app-prompt field recognition and form/dialog-scoped submission. Also return to Threads once after a verified IG handoff; P36 remains open until live confirmation. See [report](implementation/authenticator-code-form.md). |
