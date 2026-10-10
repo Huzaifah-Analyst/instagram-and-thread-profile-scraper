@@ -10,7 +10,9 @@ __pycache__/
 dist/
 build/
 *.egg-info/
-*.spec
+# Only ignore an ad-hoc spec PyInstaller drops at the repo root; the real
+# packaging spec (TSK-501) lives at config/metainspector.spec and is tracked.
+/*.spec
 
 # Virtual Environments
 venv/

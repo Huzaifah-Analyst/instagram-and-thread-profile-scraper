@@ -69,6 +69,8 @@
 | **TSK-403** | Test fail-safe abort on security challenges and checkpoints | Dev 1 | `[ ]` | Immediate alert and worker pause if Meta checkpoint or CAPTCHA is encountered. |
 | **TSK-404** | Polish UI styling, hover animations, scrollbars, and button responsiveness | Dev 2 | `[ ]` | Clean, modern user experience verified across different Windows screen resolutions. |
 
+> **Status as of 2026-10-10 (`feature/sprint4-speed-tuning`):** none of these can be checked off yet — their acceptance criteria require a real run against live Instagram/Threads, and no checker account/live access was available in this environment. What was actually done: added fail-safe-abort and extractor edge-case tests that exercise the real control flow with mocked browser interactions (not a live run), and fixed a genuine, verified bug for TSK-404 (the live table's 9 columns overflowed the 950px minimum window width with no horizontal scrollbar — fixed). See `docs/memory.md`'s Sprint 4 entry for exactly what was and wasn't verified.
+
 ---
 
 ### Sprint 5: Packaging & Client Delivery (Days 14 to 15)
@@ -80,3 +82,5 @@
 | **TSK-502** | Test standalone `.exe` on a clean Windows machine without Python | Dev 2 | `[ ]` | App runs smoothly on bare Windows machine without errors. |
 | **TSK-503** | Write Quick Start User Guide (PDF / Markdown) for client | Dev 2 | `[ ]` | Illustrated guide explaining login setup, paste input, and Google Sheets copy. |
 | **TSK-504** | Final client handover and 15-day free support warranty activation | Dev 1 & Dev 2 | `[ ]` | Client confirms receipt and approves delivery. |
+
+> **Status as of 2026-10-10 (`feature/sprint5-exe-packaging`):** TSK-501 built and actually ran (confirmed it stays open 30s+ without crashing), but its own acceptance criterion ("under 150 MB") was not met — measured 309.9 MB, over double the target, because Chromium alone is 432 MB on disk. Not checking this off; see `docs/memory.md`'s Sprint 5 entry for the full breakdown and what would have to change to get closer to 150 MB. TSK-502 not done (no clean Windows machine without Python in this environment); manual steps for Huzaifah are in that same memory.md entry. TSK-503 done (`docs/QUICK_START.md`), but written against Sprint 3 features that are not yet merged into `dev` — re-verify against the shipped build before handover. TSK-504 intentionally skipped (handover is between Huzaifah and the client, not this session).
