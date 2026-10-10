@@ -1,0 +1,10 @@
+# Test log
+
+| Date | Branch | Test type (unit / live-GUI / live-CLI / benchmark) | Mode | Workers | Accounts | Result summary | Pass/Fail vs. requirement | Link to evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-10 | fix/live-test-findings | live-CLI | Session preflight (local cookie metadata only) | 0 | 0 | `('connected', 'Instagram session found')`; does not establish live site health | Pass: saved cookie present; live health pending | [Output](implementation/evidence/round2-session-preflight.txt) |
+| 2026-10-10 | fix/data-accuracy-and-nfr1-verification | live-CLI | combined | 1 | 10 queued | Navigation returned `net::ERR_NETWORK_ACCESS_DENIED`; stopped with Ctrl+C, exit 1 | Fail: sandbox prevented live access | [CLI output](../debug/round2_control_cli.txt) |
+| 2026-10-10 | fix/data-accuracy-and-nfr1-verification | live-CLI | combined | 1 | 10 completed | CLI reports 193.8s; 10 ACTIVE rows, all four data fields missing, all rows have errors; zero dialog captures. Shell exit 1 despite complete CLI summary | Fail: no usable transparency evidence | [CLI output](../debug/round2_control_cli_unrestricted.txt) |
+| 2026-10-10 | fix/data-accuracy-and-nfr1-verification | live-CLI | IG page health diagnostic (no scraping batch) | 1 | 1 | Exit 0; visible page shows Log In / Sign Up, options count 0; challenge detector returns null | Fail: working authenticated checker prerequisite | [Text](../debug/round2_session_health_body.txt), [screenshot](../debug/round2_session_health.png), [metadata](../debug/round2_session_health.json) |
+| 2026-10-10 | fix/data-accuracy-and-nfr1-verification | unit | Full pytest suite (includes in-process GUI tests) | N/A | N/A | `66 passed, 2 warnings, 15 errors in 7.64s`; temporary directory access denied | Fail: environment prevented full suite | [Output](implementation/evidence/round2-pytest.txt) |
+| 2026-10-10 | fix/data-accuracy-and-nfr1-verification | unit | Full pytest suite (includes in-process GUI tests) | N/A | N/A | `81 passed in 4.19s`, exit 0; approved retry outside sandbox | Pass: all 81 tests green | [Output](implementation/evidence/round2-pytest-unrestricted.txt) |
