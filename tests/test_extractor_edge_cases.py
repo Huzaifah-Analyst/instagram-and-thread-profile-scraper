@@ -31,11 +31,12 @@ class FakeLocator:
     through, seen live as "Locator.click: Timeout ... Call log:" errors.
     """
 
-    def __init__(self, hits: int = 0, click_failures: int = 0) -> None:
+    def __init__(self, hits: int = 0, click_failures: int = 0, text: str = "") -> None:
         self.hits = hits
         self.clicked = False
         self.evaluated = False
         self.click_failures = click_failures
+        self.text = text
         self.click_calls: list[tuple[Optional[int], bool]] = []
 
     async def count(self) -> int:
@@ -51,7 +52,7 @@ class FakeLocator:
             raise PlaywrightTimeoutError("Locator.click: Timeout 5000ms exceeded.\nCall log:\n  - waiting")
         self.clicked = True
 
-    async def evaluate(self, _script: str) -> None:
+    async def evaluate(self, _script: str, timeout: int = 5_000) -> None:
         self.evaluated = True
         self.clicked = True
 
@@ -73,7 +74,7 @@ class FakeLocator:
         return FakeLocator(0)
 
     async def inner_text(self, timeout: int = 1_000) -> str:
-        return ""
+        return self.text
 
 
 class FakeKeyboard:
@@ -113,13 +114,15 @@ class FakePage:
 
     def locator(self, selector: str) -> FakeLocator:
         if selector in self._READY_SELECTORS:
-            return FakeLocator(1 if self._header_ready else 0)
+            return FakeLocator(1 if self._header_ready else 0, text=self._body.split()[0])
+        if selector == "header h1, header h2":
+            return FakeLocator(1 if self._header_ready else 0, text=self._body.split()[0])
         # Everything else (the IG "Options" button candidates, or the Threads
         # card/menu-svg lookups) is driven by menu_hits.
         return FakeLocator(self._menu_hits)
 
     def get_by_text(self, _text: str, exact: bool = True) -> FakeLocator:
-        return FakeLocator(0)
+        return FakeLocator(int(_text == self._body.split()[0]), text=_text)
 
 
 # ---- Instagram: no "Options" menu (private/limited accounts can hide it) --- #
@@ -127,10 +130,10 @@ class FakePage:
 def test_extract_instagram_active_with_no_options_button_does_not_crash() -> None:
     """An active profile whose "..." button never resolves must stay ACTIVE with error set, not crash."""
     page = FakePage(body="someuser 42 posts", url="https://www.instagram.com/someuser/", menu_hits=0)
-    result = asyncio.run(extract_instagram(page, "someuser"))
+    result = asyncio.run(extract_instagram(page, "someuser", page_ready_timeout_s=0.05))
     assert result["status"] == STATUS_ACTIVE
     assert result["date_joined"] is None and result["country"] is None
-    assert result["error"] == "IG options (...) button not found"
+    assert result["error"] == "IG profile menu not found"
 
 
 def test_extract_instagram_not_found_short_circuits_before_menu() -> None:
@@ -151,7 +154,7 @@ def test_extract_threads_inactive_profile_has_no_menu_and_does_not_crash() -> No
     page = FakePage(
         body="someuser\n0 posts", url="https://www.threads.com/@someuser", menu_hits=0,
     )
-    result = asyncio.run(extract_threads(page, "someuser"))
+    result = asyncio.run(extract_threads(page, "someuser", page_ready_timeout_s=0.05))
     assert result["status"] == STATUS_ACTIVE
     assert result["error"] == "Threads profile menu not found"
     assert result["date_joined"] is None and result["country"] is None
@@ -217,6 +220,10 @@ class _RecordingLocator:
 
     async def count(self) -> int:
         return 1
+
+    async def is_visible(self) -> bool:
+        """This fixture represents a visible transparency dialog."""
+        return True
 
     def nth(self, _index: int) -> "_RecordingLocator":
         return self

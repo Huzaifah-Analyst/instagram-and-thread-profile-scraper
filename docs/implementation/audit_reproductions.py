@@ -1,10 +1,13 @@
-"""Reproduce audit observations locally without visiting Meta or using a login.
+"""Historical defect characterization for commit d94c255, before implementation.
 
 Run from the repository root with:
     python -m docs.implementation.audit_reproductions
 
-Assertions characterize current defects; passing them does NOT mean the app
-meets acceptance criteria. Browser fixtures below are synthetic, not captures.
+Do not use this script as a regression suite for the repaired implementation:
+its assertions intentionally expect the old defects. The replacement checks
+are tests/test_accuracy_regressions.py, test_health_and_validation.py and
+test_checker_pool.py. Retained with its original evidence for audit history.
+Browser fixtures below are synthetic, not captures.
 """
 
 from __future__ import annotations

@@ -11,17 +11,18 @@ from typing import Callable, Optional
 import customtkinter as ctk
 
 from src.core.scraper import MODE_COMBINED, MODE_IG_ONLY, MultiWorkerScraper, login_session
-from src.core.session import SESSION_CONNECTED, SESSION_UNKNOWN, check_session
+from src.core.session import SESSION_CONNECTED, check_session
+from src.core.checkers import Checker, CheckerStore
+from src.core.paths import DEFAULT_PROFILE_DIR
 from src.gui import theme
 from src.gui.bridge import ErrorEvent, FinishedEvent, ProgressEvent, RunState, ScraperBridge, ScraperFactory
 from src.gui.components.data_table import DataTable
 from src.gui.components.left_panel import LeftPanel
 from src.gui.components.status_bar import StatusBar
+from src.gui.components.checker_dialog import CheckerDialog
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_PROFILE_DIR = PROJECT_ROOT / "browser_profile"
 POLL_INTERVAL_MS = 100
 MODE_NAMES = {MODE_COMBINED: "Combined", MODE_IG_ONLY: "Instagram Only"}
 
@@ -47,6 +48,10 @@ class MetaInspectorApp(ctk.CTk):
         self.grid_rowconfigure(1, weight=1)
 
         self.profile_dir = profile_dir
+        self.checker_store = CheckerStore(profile_dir)
+        self._session_invalid = False
+        self._active_login: Optional[Checker] = None
+        self._checker_dialog: Optional[CheckerDialog] = None
         self.bridge = ScraperBridge(scraper_factory or self._default_factory)
         self._login_thread: Optional[threading.Thread] = None
         self._login_error: Optional[str] = None
@@ -92,6 +97,8 @@ class MetaInspectorApp(ctk.CTk):
             dialog_timeout_s=self.left_panel.dialog_timeout_s,
             menu_click_timeout_s=self.left_panel.menu_click_timeout_s,
             debug_dump=self.left_panel.debug_dump, progress_callback=callback,
+            checkers=[slot for slot in self.checker_store.load() if slot.enabled],
+            persist_results=True,
         )
 
     # ------------------------------------------------------------------ #
@@ -100,7 +107,12 @@ class MetaInspectorApp(ctk.CTk):
 
     def _on_start(self) -> None:
         """Validates input and starts a run."""
-        usernames = self.left_panel.usernames()
+        try:
+            usernames = self.left_panel.usernames()
+            self.left_panel.validate_timeouts()
+        except ValueError as exc:
+            self.status_bar.message(str(exc), "error")
+            return
         if not usernames:
             self.status_bar.message("Paste at least one username first.", "warn")
             return
@@ -109,8 +121,12 @@ class MetaInspectorApp(ctk.CTk):
         self.status_bar.set_progress(0, self._total)
         self.status_bar.set_timing(0, None)
         mode = self.left_panel.mode
-        self.bridge.start(usernames, mode)
-        self.status_bar.message(f"Checking {self._total} accounts ({MODE_NAMES.get(mode, 'Threads Only')})...")
+        try:
+            self.bridge.start(usernames, mode)
+        except (OSError, ValueError) as exc:
+            self.status_bar.message(str(exc), "error")
+            return
+        self.status_bar.message("Verifying selected checker logins, then checking targets...")
         self._apply_state()
 
     def _on_pause_toggle(self) -> None:
@@ -130,19 +146,35 @@ class MetaInspectorApp(ctk.CTk):
         self._apply_state()
 
     def _on_setup(self) -> None:
-        """Opens a visible browser for one-time checker login (TSK-205)."""
+        """Open the five-slot checker account manager."""
         if self.bridge.state is not RunState.IDLE or self._login_running:
             return
+        if self._checker_dialog is not None and self._checker_dialog.winfo_exists():
+            self._checker_dialog.lift()
+            return
+        try:
+            self._checker_dialog = CheckerDialog(
+                self, self.checker_store, self._start_login, self._refresh_session
+            )
+        except (OSError, ValueError) as exc:
+            self.status_bar.message(f"Checker settings: {exc}", "error")
+
+    def _start_login(self, checker: Checker) -> None:
+        """Open this slot's official login tabs in the background thread."""
+        if self.bridge.state is not RunState.IDLE or self._login_running:
+            return
+        self._active_login = checker
         self._login_error = None
         self._login_thread = threading.Thread(target=self._login_worker, name="checker-login", daemon=True)
         self._login_thread.start()
-        self.status_bar.message("Log in with the checker account in the browser window, then close it.", "warn")
+        self.status_bar.message(f"{checker.checker_id}: log in to BOTH Instagram and Threads tabs, then close the browser.", "warn")
         self._apply_state()
 
     def _login_worker(self) -> None:
         """Background thread: runs the login browser until the user closes it."""
         try:
-            asyncio.run(login_session(self.profile_dir))
+            profile = self._active_login.profile_dir if self._active_login else self.profile_dir
+            asyncio.run(login_session(profile))
         except Exception as exc:  # noqa: BLE001 - thread boundary: report to the UI
             logger.exception("Login browser failed")
             self._login_error = str(exc).splitlines()[0] if str(exc) else type(exc).__name__
@@ -178,7 +210,8 @@ class MetaInspectorApp(ctk.CTk):
             if self._login_error:
                 self.status_bar.message(f"Login browser failed: {self._login_error}", "error")
             else:
-                self.status_bar.message("Login window closed.")
+                self._session_invalid = False
+                self.status_bar.message("Login window closed. Start will verify both selected platforms live.")
             self._refresh_session()
             self._apply_state()
 
@@ -189,9 +222,9 @@ class MetaInspectorApp(ctk.CTk):
         self.status_bar.set_timing(event.elapsed, 0)
         checked = len(event.records)
         if event.stop_reason and "session blocked" in event.stop_reason.lower():
+            self._session_invalid = True
             self.status_bar.message(
-                f"Stopped after {checked} accounts: Meta challenged the checker account. "
-                "Use 'Setup Checker Account' to log in again.", "error")
+                f"Stopped after {checked}: {event.stop_reason}", "error")
             self._refresh_session()
         elif event.stop_reason:
             self.status_bar.message(f"{event.stop_reason}. {checked}/{self._total} accounts checked.", "warn")
@@ -207,14 +240,16 @@ class MetaInspectorApp(ctk.CTk):
         self.setup_button.configure(state="disabled" if busy else "normal")
 
     def _refresh_session(self) -> None:
-        """Updates the header session indicator."""
-        state, detail = check_session(self.profile_dir)
-        if state == SESSION_CONNECTED:
-            text, color = "●  Connected", theme.STATUS_ACTIVE
-        elif state == SESSION_UNKNOWN:
-            text, color = f"●  {detail}", theme.STATUS_WARN
-        else:
-            text, color = f"●  Disconnected ({detail}) — click Setup", theme.STATUS_BANNED
+        """Show saved-login presence honestly; only preflight verifies live health."""
+        try:
+            selected = [slot for slot in self.checker_store.load() if slot.enabled]
+            saved = sum(check_session(slot.profile_dir)[0] == SESSION_CONNECTED for slot in selected)
+            text = f"{saved}/{len(selected)} IG logins saved · live check on Start"
+            color = theme.TEXT_MUTED
+        except (OSError, ValueError) as exc:
+            text, color = f"Checker settings: {exc}", theme.STATUS_WARN
+        if self._session_invalid:
+            text, color = "Checker login needs attention — open Setup", theme.STATUS_BANNED
         self._session_label.configure(text=text, text_color=color)
 
     def _on_close(self) -> None:

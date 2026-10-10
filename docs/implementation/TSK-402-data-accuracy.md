@@ -93,3 +93,29 @@ code, or other application source was changed. No speculative fixture was added.
   rejects or fails to use the saved login was not established by this diagnostic.
 
 All attempts are recorded in [the running test log](../test_log.md).
+
+
+## Follow-up after user-authorized implementation and login
+
+The earlier sections describe the initial blocked attempt. The user subsequently
+corrected the comparison: brenda_1074's manual Instagram About screenshot shows
+China / October 2025; brenna1074 (April 2016) was a different target.
+
+A fresh agent-operated Combined run after both official logins (17.1s total,
+8.36s row) captured brenda_1074's actual About panels. IG: China / October 2025.
+Threads: October 2025 / 100M+ / Not shared. Raw values and both screenshots were
+inspected and match the extracted fields. October was not replaced or normalized.
+This confirms the single-account transcription, not all repeated batch dates and
+not a Meta-side fake-data hypothesis.
+
+The latest user request authorized the independently reproduced audit fixes.
+Those retain exact date/country labels and preserve source values; changes and
+alternatives are in [transparency hardening](transparency-and-session-hardening.md).
+A new disclosure-quality defect is fixed with an exact captured-structure
+regression: [Not shared](threads-disclosure-quality.md).
+
+Final automated result: 113 passed in 13.51s. A subsequent live recheck failed at
+IG menu/Threads loading (62.0s total); no values were fabricated. Two new
+controlled 10-target batch launches were rejected by automatic review timeout
+before execution. Thus the required controlled batch across multiple accounts
+still lacks fresh evidence; Task 1's batch-wide accuracy question is not closed.

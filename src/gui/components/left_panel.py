@@ -13,6 +13,7 @@ from src.core.extractors import DIALOG_TIMEOUT_S, MENU_CLICK_TIMEOUT_S
 from src.core.scraper import DEFAULT_WORKERS, MODE_COMBINED, MODE_IG_ONLY, MODE_THREADS_ONLY, clean_usernames
 from src.gui import theme
 from src.gui.bridge import RunState
+from src.core.validation import positive_seconds
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ class LeftPanel(ctk.CTkFrame):
 
         workers_row = ctk.CTkFrame(self, fg_color="transparent")
         workers_row.grid(row=7, column=0, sticky="ew", padx=16, pady=(12, 0))
-        ctk.CTkLabel(workers_row, text="Workers", font=theme.FONT_SECTION,
+        ctk.CTkLabel(workers_row, text="Checker limit", font=theme.FONT_SECTION,
                      text_color=theme.TEXT_PRIMARY).pack(side="left")
         self.workers_var = ctk.StringVar(value=str(DEFAULT_WORKERS))
         self.workers_menu = ctk.CTkOptionMenu(workers_row, values=list(WORKER_CHOICES),
@@ -156,19 +157,18 @@ class LeftPanel(ctk.CTkFrame):
 
     @property
     def dialog_timeout_s(self) -> float:
-        """Dialog-render timeout in seconds; falls back to the default on invalid input."""
-        try:
-            return float(self.dialog_timeout_var.get())
-        except ValueError:
-            return DIALOG_TIMEOUT_S
+        """Validated dialog-render timeout in seconds; invalid input raises."""
+        return positive_seconds(float(self.dialog_timeout_var.get()))
 
     @property
     def menu_click_timeout_s(self) -> float:
-        """Menu-item-click timeout in seconds; falls back to the default on invalid input."""
-        try:
-            return float(self.menu_timeout_var.get())
-        except ValueError:
-            return MENU_CLICK_TIMEOUT_S
+        """Validated menu-click timeout in seconds; invalid input raises."""
+        return positive_seconds(float(self.menu_timeout_var.get()))
+
+    def validate_timeouts(self) -> None:
+        """Validate both fields before starting any background work."""
+        positive_seconds(self.dialog_timeout_s)
+        positive_seconds(self.menu_click_timeout_s)
 
     @property
     def debug_dump(self) -> bool:
@@ -212,9 +212,14 @@ class LeftPanel(ctk.CTkFrame):
             self._count_label.configure(text="Could not read file", text_color=theme.STATUS_BANNED)
             return
         self.textbox.delete("1.0", "end")
-        self.textbox.insert("1.0", "\n".join(clean_usernames(text.splitlines())))
+        self.textbox.insert("1.0", text)
         self._refresh_count()
 
     def _refresh_count(self) -> None:
         """Updates the "N accounts" caption."""
-        self._count_label.configure(text=f"{len(self.usernames())} accounts", text_color=theme.TEXT_MUTED)
+        try:
+            count = len(self.usernames())
+        except ValueError:
+            self._count_label.configure(text="Invalid username/URL", text_color=theme.STATUS_WARN)
+            return
+        self._count_label.configure(text=f"{count} accounts", text_color=theme.TEXT_MUTED)

@@ -61,6 +61,10 @@ class BanLinkEngine:
         ig = cls.normalize(ig_status)
         threads = cls.normalize(threads_status)
 
+        # A checker failure takes priority over any target verdict.
+        if STATUS_SESSION_BLOCKED in (ig, threads):
+            return {"composite_status": COMPOSITE_BLOCKED, "ig_status": ig, "threads_status": threads}
+
         # FR-3: a ban on either platform propagates to both.
         if ig in cls.BANNED_STATES or threads in cls.BANNED_STATES:
             return {
@@ -68,11 +72,6 @@ class BanLinkEngine:
                 "ig_status": STATUS_BANNED,
                 "threads_status": STATUS_BANNED,
             }
-
-        # The checker's own session was challenged, so nothing about the
-        # target account can be trusted. Never report this as a ban.
-        if STATUS_SESSION_BLOCKED in (ig, threads):
-            return {"composite_status": COMPOSITE_BLOCKED, "ig_status": ig, "threads_status": threads}
 
         checked = [s for s in (ig, threads) if s != STATUS_SKIPPED]
 

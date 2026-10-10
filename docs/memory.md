@@ -231,3 +231,51 @@ Huzaifah supplied two screenshots of a 95-account Combined/5-worker run with deb
 ### 6.8 Source audit and corrected same-account comparison (2026-10-10)
 
 Huzaifah requested all source checked and problems kept in one file. Created [problem_log.md](problem_log.md) with stable P01–P30 entries and evidence states. The initial alleged country/date mismatch compared brenna1074 (April 2016, country absent) with brenda_1074 (China / October 2025); the corrected same-account browser screenshot explicitly matches the app's China / October 2025. No date-parser change was justified by that comparison. Reviewed the runtime path and statically inventoried all 57 existing Python files (16 production, 37 legacy, four tests); local synthetic Chromium and pure-code checks reproduced 12 observation groups, including hidden/unrelated-dialog acceptance, incomplete polling, malformed label-as-value, wrong menu targeting and false ACTIVE classification. These are proven local risks, not a claim they caused the actual matching October value. Full suite: `81 passed in 1.86s`. No application source or live checker state changed. [Audit method and alternatives](implementation/source-audit-and-problem-log.md), [reproduction output](implementation/evidence/audit-reproductions.txt) and [running test log](test_log.md) retain the evidence.
+
+
+### 2026-10-10 ? Independent checker pool implementation
+
+The user authorized categorizing and implementing the audit findings and accepted
+manual verification where required. Added five isolated saved profiles, official
+IG/Threads login tabs, a shared queue, per-checker attribution and global challenge
+stop. Scheduler regressions exercise five contexts and 21 unique targets; live
+five-account operation is not yet established. Details and rejected alternatives:
+[isolated-checker-pool.md](implementation/isolated-checker-pool.md).
+
+### 2026-10-10 ? Transparency/session hardening and exact Threads diagnosis
+
+The original live Threads capture showed a login wall despite an About-menu error.
+New preflight now reports Threads login required before work (23.2s); an initial
+CSP-incompatible readiness check was corrected and rechecked live. Hidden/wrong-user
+dialogs, adjacent labels, delayed fields, generic-error classification, input
+validation and stop-between-platform behavior now have regression coverage. A new
+IG-only run still failed to open About (25.3s total), so successful live extraction
+is not claimed. User confirmed both logins complete; post-login agent runs were
+blocked by approval-review timeouts and a captured manual run was requested.
+[transparency-and-session-hardening.md](implementation/transparency-and-session-hardening.md).
+
+### 2026-10-10 ? Result evidence and durable data paths
+
+Added Data quality, checker ID, full row details, immediate local JSONL persistence
+and opt-in screenshots/text/stage metadata. Source paths preserve the original
+checker session; frozen data paths use LOCALAPPDATA. No executable rebuild or
+restart acceptance was performed. README no longer advertises unverified throughput
+or absent export/history features. See [result-evidence-and-stable-storage.md](implementation/result-evidence-and-stable-storage.md)
+and [manual_verification.md](manual_verification.md). Full test execution history,
+including Tcl initialization failures and permission-review timeouts, is retained
+in test_log.md; do not count those as a green full suite.
+
+
+### 2026-10-10 - Live disclosure follow-up and final suite
+
+After the operator completed both logins, an agent-operated Combined run read both
+About panels for brenda_1074 in 17.1s total / 8.36s row. Actual IG data was China /
+October 2025; Threads was October 2025 / 100M+ / Not shared. The Not shared value
+revealed a completeness defect, now fixed while preserving the exact source text;
+see [threads-disclosure-quality.md](implementation/threads-disclosure-quality.md).
+The following live recheck failed earlier during page/menu loading (62.0s total),
+so repeated live reliability remains open. Both controlled 10-target launch
+attempts timed out in automatic approval review before running. Final full suite
+passed outside the sandbox: **113 passed in 13.51s**, zero skips. The central
+problem log and task reports distinguish successful single-account transcription,
+remaining batch accuracy/performance work, and release packaging limitations.

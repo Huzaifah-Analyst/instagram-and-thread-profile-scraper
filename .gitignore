@@ -23,6 +23,9 @@ ENV/
 # Playwright & Browser Sessions (CRITICAL SECURITY: NEVER COMMIT)
 browser_profile/
 **/browser_profile/
+checker_profiles/
+checkers.json
+checkers.tmp
 *.session
 cookies.json
 tokens.json
@@ -34,6 +37,10 @@ logs/
 debug/
 **/debug/
 .pytest_cache/
+.pytest-local-temp*/
+.test-tcl/
+/docs/accounts.txt
+/docs/testinusername.txt
 
 # Sensitive Configuration
 .env

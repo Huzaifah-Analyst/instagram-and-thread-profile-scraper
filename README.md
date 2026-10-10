@@ -4,13 +4,34 @@ A high-performance Windows desktop application to verify account alive/banned st
 
 ---
 
-## Key Features
-- **High Throughput:** 100 accounts in 4 to 5 minutes via 5-worker parallel browser concurrency.
-- **Cross-Platform Ban Linking:** If either platform is flagged as banned/suspended, both are marked as BANNED.
-- **Three Modes:** Instagram Only, Threads Only, or Combined Mode.
-- **1-Click Google Sheets Export:** Copies clean TSV formatted data to clipboard for immediate `Ctrl + V` pasting.
-- **Run History:** Embedded SQLite database logging all past execution runs.
-- **1-Time Login:** Persistent browser session storage with zero plain-text password retention.
+## Current branch capabilities
+
+- Instagram Only, Threads Only and Combined lookups.
+- Five independent saved checker profiles, one active worker per profile, with
+  per-platform login preflight and a shared target queue.
+- Target identity checks, separate account status and extraction quality,
+  checker attribution, full row details and opt-in local debug captures.
+- Immediate JSONL result retention in `results/`; passwords/2FA are entered in
+  official browser tabs, not stored in application configuration.
+
+One authenticated Combined extraction has been verified against raw dialogs;
+a later run failed during page/menu loading. Reliable five-account scaling and
+the **100 accounts under five minutes** benchmark are not yet verified.
+Current findings are tracked in [the problem log](docs/problem_log.md). Clipboard/Google
+Sheets export and a SQLite history viewer are not implemented on this branch.
+
+## Run and set up accounts
+
+```powershell
+python main.py
+```
+
+Restart an older running app to load these changes. Open **Setup Checker Account**,
+log into both Instagram and Threads for each slot, close each login browser,
+select the slots and save. The **Checker limit** caps concurrent slots.
+See [step-by-step verification](docs/manual_verification.md) and the
+[actual test outcomes](docs/test_log.md). The old packaged executable has not
+been rebuilt with these changes.
 
 ---
 

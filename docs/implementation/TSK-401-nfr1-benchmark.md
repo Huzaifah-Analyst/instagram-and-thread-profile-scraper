@@ -26,3 +26,17 @@ The live failures occurred before transparency polling: all 10 IG rows lacked
 the Options control; nine Threads rows lacked the About option and one lacked
 the profile menu. These are observed failure locations, not proof of a timing
 bottleneck. No five-worker benchmark bottleneck or invasive fix is claimed.
+
+
+## Follow-up implementation status
+
+The later user request authorized five independent checker profiles and a shared
+queue. That implementation is regression-tested with five simulated contexts,
+not benchmarked with five authenticated live accounts. A single Combined target
+was read in 17.1s total (8.36s row) after re-login; a later target attempt took
+62.0s and failed during loading. Neither is a 100-account benchmark. Controlled
+10-target launches were also prevented by approval-review timeouts.
+
+**NFR-1 remains unverified, not met by evidence.** No throughput estimate or success
+rate is extrapolated from the one successful target. Fresh baseline stability and
+five working logins are required before the 100-account benchmark.
