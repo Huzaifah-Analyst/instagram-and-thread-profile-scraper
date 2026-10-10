@@ -149,6 +149,7 @@ class MultiWorkerScraper:
         page_ready_timeout_s: float = PAGE_READY_TIMEOUT_S,
         dialog_timeout_s: float = DIALOG_TIMEOUT_S,
         menu_click_timeout_s: float = MENU_CLICK_TIMEOUT_S,
+        debug_dump: bool = False,
         progress_callback: Optional[ProgressCallback] = None,
     ) -> None:
         """Configures the scraper.
@@ -168,6 +169,10 @@ class MultiWorkerScraper:
                 dialog/panel to render parseable text.
             menu_click_timeout_s: How long an extractor waits for a menu item
                 to appear before clicking it.
+            debug_dump: If true, every dialog/panel text actually seen is
+                written to ``debug/`` (git-ignored) for post-mortem review --
+                e.g. to confirm a parsed join date is genuine, not a stale or
+                decoy value. See `docs/memory.md`'s 2026-10-10 live test entry.
             progress_callback: Called as ``(done, total, record)`` after each account.
                 It runs on the scraper's event-loop thread, so GUI code should
                 hand the record to a queue rather than touch widgets directly.
@@ -185,6 +190,7 @@ class MultiWorkerScraper:
         self.page_ready_timeout_s = page_ready_timeout_s
         self.dialog_timeout_s = dialog_timeout_s
         self.menu_click_timeout_s = menu_click_timeout_s
+        self.debug_dump = debug_dump
         self.progress_callback = progress_callback
         self.blocker_stats: list[BlockerStats] = []
         self.stop_reason: Optional[str] = None
@@ -302,6 +308,7 @@ class MultiWorkerScraper:
             "page_ready_timeout_s": self.page_ready_timeout_s,
             "dialog_timeout_s": self.dialog_timeout_s,
             "menu_click_timeout_s": self.menu_click_timeout_s,
+            "debug_dump": self.debug_dump,
         }
         try:
             if self.mode in (MODE_IG_ONLY, MODE_COMBINED):
@@ -373,6 +380,9 @@ def main() -> None:
                         help="Seconds to wait for the transparency dialog/panel to render")
     parser.add_argument("--menu-click-timeout", type=float, default=MENU_CLICK_TIMEOUT_S,
                         help="Seconds to wait for a menu item to appear before clicking it")
+    parser.add_argument("--debug-dump", action="store_true",
+                        help="Write every dialog/panel text seen to debug/ (git-ignored), to "
+                             "check whether a parsed value is genuine vs. stale/decoy data")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -392,7 +402,8 @@ def main() -> None:
 
     scraper = MultiWorkerScraper(profile_dir=args.profile, workers=args.workers, mode=args.mode,
                                  headless=not args.headed, page_ready_timeout_s=args.page_ready_timeout,
-                                 dialog_timeout_s=args.dialog_timeout, menu_click_timeout_s=args.menu_click_timeout)
+                                 dialog_timeout_s=args.dialog_timeout, menu_click_timeout_s=args.menu_click_timeout,
+                                 debug_dump=args.debug_dump)
     t0 = time.monotonic()
     records = scraper.run(names)
     elapsed = time.monotonic() - t0

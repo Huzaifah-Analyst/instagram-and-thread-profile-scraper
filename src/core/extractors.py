@@ -14,7 +14,9 @@ import asyncio
 import logging
 import re
 import time
-from typing import Optional
+from datetime import datetime
+from pathlib import Path
+from typing import Callable, Optional
 from urllib.parse import urlparse
 
 from playwright.async_api import Error as PlaywrightError
@@ -35,10 +37,18 @@ INSTAGRAM_URL = "https://www.instagram.com/{username}/"
 THREADS_URL = "https://www.threads.com/@{username}"
 
 NAVIGATION_TIMEOUT_MS = 30_000
-PAGE_READY_TIMEOUT_S = 8.0
-DIALOG_TIMEOUT_S = 8.0
-MENU_CLICK_TIMEOUT_S = 4.0
+# Raised from the original 8.0/8.0/4.0 after the 2026-10-10 live test batch
+# (docs/memory.md) showed most Threads failures were "'About this profile'
+# option not found" within the old 4.0s menu-click budget, and several IG
+# failures were "about dialog did not load" within 8.0s -- both plausibly
+# just the account's current slower response time, not only concurrency.
+# docs/rules.md caps dynamic polling at "max 8-10s", so these stay in range.
+PAGE_READY_TIMEOUT_S = 10.0
+DIALOG_TIMEOUT_S = 10.0
+MENU_CLICK_TIMEOUT_S = 8.0
 POLL_INTERVAL_S = 0.25
+CLICK_ACTION_TIMEOUT_MS = 5_000  # see _safe_click
+DEBUG_DIR = Path("debug")
 
 # Label lines in the transparency dialogs (compared lower-cased, exact line).
 DATE_KEYS = ("date joined", "joined", "date of creation", "katılma tarihi")
@@ -235,7 +245,7 @@ async def _click_menu_item(
         candidates = [page.get_by_text(t, exact=True).last for t in texts]
         item = await _first_visible(candidates)
         if item is not None:
-            await item.click()
+            await _safe_click(item)
             return True
         await asyncio.sleep(POLL_INTERVAL_S)
     return False
@@ -246,6 +256,7 @@ async def _poll_dialog(
     container_selectors: tuple[str, ...],
     max_chars: int = 2_000,
     dialog_timeout_s: float = DIALOG_TIMEOUT_S,
+    debug_sink: Optional[Callable[[str], None]] = None,
 ) -> dict:
     """Polls the transparency dialog until a date or country is parsed.
 
@@ -255,6 +266,8 @@ async def _poll_dialog(
         max_chars: Containers with longer text are skipped, so broad fallback
             selectors cannot match the whole page (and a bio line).
         dialog_timeout_s: How long to poll before giving up (seconds).
+        debug_sink: If given, called with every dialog text this function
+            reads (within ``max_chars``), matched or not, for `_write_debug_dump`.
 
     Returns:
         Parsed dict from ``parse_about_dialog`` (all ``None`` on timeout).
@@ -271,11 +284,76 @@ async def _poll_dialog(
                     continue
                 if len(text) > max_chars:
                     continue
+                if debug_sink is not None:
+                    debug_sink(text)
                 parsed = parse_about_dialog(text)
                 if parsed["date_joined"] or parsed["country"]:
                     return parsed
         await asyncio.sleep(POLL_INTERVAL_S)
     return empty
+
+
+async def _safe_click(locator: Locator, timeout_ms: int = CLICK_ACTION_TIMEOUT_MS) -> None:
+    """Clicks a locator, falling back to a forced click then a raw JS click.
+
+    Live testing on 2026-10-10 (docs/memory.md) showed Threads' options SVG
+    sometimes hangs a plain ``.click()`` for Playwright's full ~30s default
+    actionability timeout (an element that Playwright can locate but decides
+    is not "stable"/unobscured enough to click normally), which then surfaces
+    as a raw, multi-line "Locator.click: Timeout ... Call log:" error. Each
+    stage here is capped short so the worst case is a few seconds, not ~30s.
+
+    Args:
+        locator: Element to click.
+        timeout_ms: Budget for each of the plain and forced click attempts.
+    """
+    try:
+        await locator.click(timeout=timeout_ms)
+        return
+    except PlaywrightTimeoutError:
+        logger.debug("Plain click timed out, retrying with force=True")
+    try:
+        await locator.click(timeout=timeout_ms, force=True)
+        return
+    except PlaywrightError as exc:
+        logger.debug("Forced click failed (%s), falling back to a JS click", exc)
+    await locator.evaluate("el => el.click()")
+
+
+def _short_error(prefix: str, exc: Exception) -> str:
+    """Formats an exception as one short line instead of Playwright's full,
+    multi-line "Call log:" trace, which is unreadable dumped into the UI table.
+    """
+    text = str(exc)
+    first_line = text.splitlines()[0] if text else type(exc).__name__
+    return f"{prefix}: {first_line}"
+
+
+def _write_debug_dump(platform: str, username: str, texts: list[str]) -> None:
+    """Best-effort dump of raw dialog text actually seen, for post-mortem review.
+
+    This is the diagnostic `docs/ISSUE_concurrent_session_detection.md` §5
+    item 3 asked for and that was never implemented: when extraction
+    succeeds, it lets Huzaifah confirm a parsed value (e.g. a join date) is
+    genuinely account-specific rather than a stale/decoy value Meta served
+    to a flagged session; when it fails, it shows what was actually on
+    screen instead of just "timed out". Writes to `debug/`, which is
+    git-ignored. Never raises -- a failed dump must not fail the check.
+
+    Args:
+        platform: ``"ig"`` or ``"threads"``, used in the file name.
+        username: Account being checked, used in the file name.
+        texts: Every dialog/panel text seen during the poll, in order.
+    """
+    if not texts:
+        return
+    try:
+        DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        path = DEBUG_DIR / f"{platform}_{username}_{stamp}.txt"
+        path.write_text("\n\n---\n\n".join(texts), encoding="utf-8")
+    except OSError as exc:
+        logger.warning("Could not write debug dump for %s/%s: %s", platform, username, exc)
 
 
 async def _dismiss(page: Page) -> None:
@@ -311,6 +389,7 @@ async def extract_instagram(
     page_ready_timeout_s: float = PAGE_READY_TIMEOUT_S,
     dialog_timeout_s: float = DIALOG_TIMEOUT_S,
     menu_click_timeout_s: float = MENU_CLICK_TIMEOUT_S,
+    debug_dump: bool = False,
 ) -> dict:
     """Checks an Instagram profile and reads its transparency data.
 
@@ -325,12 +404,15 @@ async def extract_instagram(
             to render enough text to parse.
         menu_click_timeout_s: How long to wait for a menu item to appear before
             clicking it.
+        debug_dump: If true, writes every dialog text seen to ``debug/`` (see
+            `_write_debug_dump`), to check whether a parsed value is genuine.
 
     Returns:
         Dict with ``status``, ``date_joined``, ``country``, ``seconds`` and ``error``.
     """
     t0 = time.monotonic()
     res = _result()
+    captured: list[str] = []
     try:
         # "header h2" is the profile username; a bare <header> also exists on error pages.
         body = await _open_profile(
@@ -357,20 +439,25 @@ async def extract_instagram(
         if options is None:
             res["error"] = "IG options (...) button not found"
             return res
-        await options.click()
+        await _safe_click(options)
 
         if not await _click_menu_item(page, ABOUT_IG_TEXTS, timeout_s=menu_click_timeout_s):
             res["error"] = "IG 'About this account' option not found"
             return res
 
-        parsed = await _poll_dialog(page, ("div[role='dialog']",), dialog_timeout_s=dialog_timeout_s)
+        parsed = await _poll_dialog(
+            page, ("div[role='dialog']",), dialog_timeout_s=dialog_timeout_s,
+            debug_sink=captured.append if debug_dump else None,
+        )
         res.update(date_joined=parsed["date_joined"], country=parsed["country"])
         if not (parsed["date_joined"] or parsed["country"]):
             res["error"] = "IG about dialog did not load within timeout"
     except PlaywrightError as exc:
         logger.warning("Instagram extraction failed for %s: %s", username, exc)
-        res["error"] = f"IG error: {exc}"
+        res["error"] = _short_error("IG error", exc)
     finally:
+        if debug_dump:
+            _write_debug_dump("ig", username, captured)
         await _dismiss(page)
         res["seconds"] = round(time.monotonic() - t0, 2)
     return res
@@ -412,6 +499,7 @@ async def extract_threads(
     page_ready_timeout_s: float = PAGE_READY_TIMEOUT_S,
     dialog_timeout_s: float = DIALOG_TIMEOUT_S,
     menu_click_timeout_s: float = MENU_CLICK_TIMEOUT_S,
+    debug_dump: bool = False,
 ) -> dict:
     """Checks a Threads profile and reads its transparency data.
 
@@ -426,6 +514,8 @@ async def extract_threads(
             to render enough text to parse.
         menu_click_timeout_s: How long to wait for a menu item to appear before
             clicking it.
+        debug_dump: If true, writes every panel text seen to ``debug/`` (see
+            `_write_debug_dump`), to check whether a parsed value is genuine.
 
     Returns:
         Dict with ``status``, ``date_joined``, ``join_badge``, ``country``,
@@ -433,6 +523,7 @@ async def extract_threads(
     """
     t0 = time.monotonic()
     res = _result()
+    captured: list[str] = []
     try:
         body = await _open_profile(
             page, THREADS_URL.format(username=username), "div[aria-label='Column body'] h1, div[role='main'] h1",
@@ -454,7 +545,7 @@ async def extract_threads(
             # Inactive profiles often have no menu (memory.md quirk #1).
             res["error"] = "Threads profile menu not found"
             return res
-        await menu.click()
+        await _safe_click(menu)
 
         if not await _click_menu_item(page, ABOUT_THREADS_TEXTS, timeout_s=menu_click_timeout_s):
             res["error"] = "Threads 'About this profile' option not found"
@@ -465,14 +556,17 @@ async def extract_threads(
         parsed = await _poll_dialog(
             page, ("div[role='dialog']", "div:has-text('Based in')"), max_chars=400,
             dialog_timeout_s=dialog_timeout_s,
+            debug_sink=captured.append if debug_dump else None,
         )
         res.update(parsed)
         if not (parsed["date_joined"] or parsed["country"]):
             res["error"] = "Threads about panel did not load within timeout"
     except PlaywrightError as exc:
         logger.warning("Threads extraction failed for %s: %s", username, exc)
-        res["error"] = f"Threads error: {exc}"
+        res["error"] = _short_error("Threads error", exc)
     finally:
+        if debug_dump:
+            _write_debug_dump("threads", username, captured)
         await _dismiss(page)
         res["seconds"] = round(time.monotonic() - t0, 2)
     return res

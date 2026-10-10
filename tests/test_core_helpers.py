@@ -144,6 +144,40 @@ def test_scraper_timeouts_are_configurable_without_a_code_change(tmp_path) -> No
     assert (scraper.page_ready_timeout_s, scraper.dialog_timeout_s, scraper.menu_click_timeout_s) == (16.0, 16.0, 8.0)
 
 
+def test_scraper_debug_dump_defaults_off_and_is_configurable(tmp_path) -> None:
+    from src.core.scraper import MultiWorkerScraper
+
+    assert MultiWorkerScraper(profile_dir=tmp_path).debug_dump is False
+    assert MultiWorkerScraper(profile_dir=tmp_path, debug_dump=True).debug_dump is True
+
+
+def test_check_account_passes_timeouts_and_debug_dump_to_extractors(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    """`_check_account` must forward the scraper's configured timeouts/debug_dump, not the
+    extractor module defaults, to whichever mode's extractor(s) it calls."""
+    import src.core.scraper as scraper_module
+
+    seen_kwargs: dict = {}
+
+    async def fake_extract_instagram(_page, _username: str, **kwargs) -> dict:
+        seen_kwargs.update(kwargs)
+        return {**empty_platform_result(), "status": "active"}
+
+    monkeypatch.setattr(scraper_module, "extract_instagram", fake_extract_instagram)
+
+    scraper = MultiWorkerScraper(
+        profile_dir=tmp_path, mode="ig_only", page_ready_timeout_s=11.0,
+        dialog_timeout_s=12.0, menu_click_timeout_s=13.0, debug_dump=True,
+    )
+    asyncio.run(scraper._check_account(object(), "someuser"))
+
+    assert seen_kwargs == {
+        "page_ready_timeout_s": 11.0, "dialog_timeout_s": 12.0,
+        "menu_click_timeout_s": 13.0, "debug_dump": True,
+    }
+
+
 def test_build_record_links_ban_and_joins_errors() -> None:
     ig = {**empty_platform_result(), "status": "active", "country": "Turkey"}
     threads = {**empty_platform_result(), "status": "suspended", "error": "x"}

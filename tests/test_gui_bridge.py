@@ -224,6 +224,25 @@ def test_record_to_row_surfaces_error_message() -> None:
     assert row[-1] == "IG about dialog did not load within timeout"
 
 
+def test_record_to_row_collapses_a_multiline_error_to_one_line() -> None:
+    """A raw multi-line Playwright exception (seen live, 2026-10-10) must not grow the row."""
+    record = {"username": "elif", "composite_status": "ACTIVE", "ig_status": "active", "seconds": 34.7,
+              "error_message": "Threads error: Locator.click: Timeout 5000ms exceeded.\nCall log:\n  - waiting"}
+    row = record_to_row(1, record)
+    assert "\n" not in row[-1]
+    assert row[-1] == "Threads error: Locator.click: Timeout 5000ms exceeded. Call log: - waiting"
+
+
+def test_record_to_row_truncates_a_very_long_error() -> None:
+    from src.gui.components.data_table import _ERROR_CELL_MAX_CHARS
+
+    record = {"username": "elif", "composite_status": "ACTIVE", "ig_status": "active",
+              "seconds": 1.0, "error_message": "x" * 500}
+    row = record_to_row(1, record)
+    assert len(row[-1]) == _ERROR_CELL_MAX_CHARS
+    assert row[-1].endswith("…")
+
+
 def test_eta_and_duration() -> None:
     assert theme.estimate_eta(60, 0, 100) is None
     assert theme.estimate_eta(60, 20, 100) == 240
@@ -248,6 +267,35 @@ def test_gui_worker_count_is_not_hardcoded(tmp_path: Path) -> None:
         assert app.left_panel.workers == 1
         scraper = app._default_factory("combined", lambda *_: None)
         assert scraper.workers == 1
+    finally:
+        app.destroy()
+
+
+def test_gui_dialog_menu_timeout_and_debug_dump_are_not_hardcoded(tmp_path: Path) -> None:
+    """2026-10-10 live test gap: the GUI always used the extractor module defaults for
+    dialog/menu-click timeouts and never exposed debug capture, unlike the CLI."""
+    from src.core.extractors import DIALOG_TIMEOUT_S, MENU_CLICK_TIMEOUT_S
+    from src.gui.app import MetaInspectorApp
+
+    try:
+        app = MetaInspectorApp(profile_dir=tmp_path)
+    except tk.TclError as exc:
+        pytest.skip(f"No display available: {exc}")
+    try:
+        app.withdraw()
+        assert app.left_panel.dialog_timeout_s == DIALOG_TIMEOUT_S
+        assert app.left_panel.menu_click_timeout_s == MENU_CLICK_TIMEOUT_S
+        assert app.left_panel.debug_dump is False
+
+        app.left_panel.dialog_timeout_var.set("20")
+        app.left_panel.menu_timeout_var.set("15")
+        app.left_panel.debug_dump_var.set(True)
+
+        scraper = app._default_factory("combined", lambda *_: None)
+        assert (scraper.dialog_timeout_s, scraper.menu_click_timeout_s, scraper.debug_dump) == (20.0, 15.0, True)
+
+        app.left_panel.dialog_timeout_var.set("not a number")
+        assert app.left_panel.dialog_timeout_s == DIALOG_TIMEOUT_S  # invalid input falls back, doesn't crash
     finally:
         app.destroy()
 

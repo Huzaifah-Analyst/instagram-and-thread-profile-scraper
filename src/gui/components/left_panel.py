@@ -9,6 +9,7 @@ from typing import Callable
 
 import customtkinter as ctk
 
+from src.core.extractors import DIALOG_TIMEOUT_S, MENU_CLICK_TIMEOUT_S
 from src.core.scraper import DEFAULT_WORKERS, MODE_COMBINED, MODE_IG_ONLY, MODE_THREADS_ONLY, clean_usernames
 from src.gui import theme
 from src.gui.bridge import RunState
@@ -88,15 +89,45 @@ class LeftPanel(ctk.CTkFrame):
                                               button_hover_color=theme.BORDER_COLOR)
         self.workers_menu.pack(side="right")
 
+        # Dialog/menu-click timeouts: exposed after live testing on 2026-10-10
+        # (docs/memory.md) showed most failures were the old, tighter defaults
+        # running out before Threads'/Instagram's panel finished rendering.
+        # Previously only the CLI's --dialog-timeout/--menu-click-timeout could
+        # change these; the GUI silently always used the module defaults.
+        timeouts_row = ctk.CTkFrame(self, fg_color="transparent")
+        timeouts_row.grid(row=8, column=0, sticky="ew", padx=16, pady=(10, 0))
+        timeouts_row.grid_columnconfigure((1, 3), weight=1)
+        ctk.CTkLabel(timeouts_row, text="Dialog (s)", font=theme.FONT_CAPTION,
+                     text_color=theme.TEXT_MUTED).grid(row=0, column=0, sticky="w")
+        self.dialog_timeout_var = ctk.StringVar(value=str(DIALOG_TIMEOUT_S))
+        self.dialog_timeout_entry = ctk.CTkEntry(timeouts_row, textvariable=self.dialog_timeout_var, width=48,
+                                                 fg_color=theme.BG_ELEVATED, border_color=theme.BORDER_COLOR,
+                                                 font=theme.FONT_CAPTION)
+        self.dialog_timeout_entry.grid(row=0, column=1, sticky="w", padx=(4, 12))
+        ctk.CTkLabel(timeouts_row, text="Menu (s)", font=theme.FONT_CAPTION,
+                     text_color=theme.TEXT_MUTED).grid(row=0, column=2, sticky="w")
+        self.menu_timeout_var = ctk.StringVar(value=str(MENU_CLICK_TIMEOUT_S))
+        self.menu_timeout_entry = ctk.CTkEntry(timeouts_row, textvariable=self.menu_timeout_var, width=48,
+                                               fg_color=theme.BG_ELEVATED, border_color=theme.BORDER_COLOR,
+                                               font=theme.FONT_CAPTION)
+        self.menu_timeout_entry.grid(row=0, column=3, sticky="w", padx=(4, 0))
+
+        self.debug_dump_var = ctk.BooleanVar(value=False)
+        self.debug_dump_check = ctk.CTkCheckBox(
+            self, text="🐛  Save debug captures", variable=self.debug_dump_var, font=theme.FONT_CAPTION,
+            text_color=theme.TEXT_MUTED, fg_color=theme.ACCENT_BLUE, hover_color=theme.ACCENT_HOVER,
+        )
+        self.debug_dump_check.grid(row=9, column=0, sticky="w", padx=16, pady=(8, 0))
+
         ctk.CTkLabel(self, text="Controls", font=theme.FONT_SECTION,
-                     text_color=theme.TEXT_PRIMARY).grid(row=8, column=0, sticky="w", padx=16, pady=(16, 6))
+                     text_color=theme.TEXT_PRIMARY).grid(row=10, column=0, sticky="w", padx=16, pady=(16, 6))
         self.start_button = ctk.CTkButton(self, text="▶  Start Checking", command=on_start, height=38,
                                           fg_color=theme.ACCENT_BLUE, hover_color=theme.ACCENT_HOVER,
                                           font=theme.FONT_SECTION)
-        self.start_button.grid(row=9, column=0, sticky="ew", padx=16)
+        self.start_button.grid(row=11, column=0, sticky="ew", padx=16)
 
         row_frame = ctk.CTkFrame(self, fg_color="transparent")
-        row_frame.grid(row=10, column=0, sticky="ew", padx=16, pady=(8, 16))
+        row_frame.grid(row=12, column=0, sticky="ew", padx=16, pady=(8, 16))
         row_frame.grid_columnconfigure((0, 1), weight=1)
         self.pause_button = ctk.CTkButton(row_frame, text="❚❚  Pause", command=on_pause_toggle,
                                           fg_color=theme.BG_ELEVATED, hover_color=theme.BORDER_COLOR,
@@ -123,6 +154,27 @@ class LeftPanel(ctk.CTkFrame):
         """Selected worker count (1 to 5), so a 1-worker run can be tested from the GUI."""
         return int(self.workers_var.get())
 
+    @property
+    def dialog_timeout_s(self) -> float:
+        """Dialog-render timeout in seconds; falls back to the default on invalid input."""
+        try:
+            return float(self.dialog_timeout_var.get())
+        except ValueError:
+            return DIALOG_TIMEOUT_S
+
+    @property
+    def menu_click_timeout_s(self) -> float:
+        """Menu-item-click timeout in seconds; falls back to the default on invalid input."""
+        try:
+            return float(self.menu_timeout_var.get())
+        except ValueError:
+            return MENU_CLICK_TIMEOUT_S
+
+    @property
+    def debug_dump(self) -> bool:
+        """``True`` when "Save debug captures" is checked."""
+        return bool(self.debug_dump_var.get())
+
     def apply_state(self, state: RunState, start_allowed: bool = True) -> None:
         """Enables/disables controls for the given run state.
 
@@ -143,6 +195,9 @@ class LeftPanel(ctk.CTkFrame):
         for button in self._mode_buttons:
             button.configure(state=input_state)
         self.workers_menu.configure(state=input_state)
+        self.dialog_timeout_entry.configure(state=input_state)
+        self.menu_timeout_entry.configure(state=input_state)
+        self.debug_dump_check.configure(state=input_state)
 
     def _import_file(self) -> None:
         """Loads a .txt file of usernames into the textbox."""

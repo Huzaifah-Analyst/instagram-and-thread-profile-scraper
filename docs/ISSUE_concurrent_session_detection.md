@@ -4,9 +4,10 @@
 **Project:** MetaInspector Desktop (Instagram & Threads Checker)
 **Raised by:** Claude Code, Owner's session (Lead Architect/QA role, see `docs/team_roles_and_workflow.md`)
 **For:** Partner Developer + Claude
-**Date:** 2026-10-07, updated 2026-10-08
-**Status:** Open, not yet isolated. Does not block Sprint 3, but must be resolved before Sprint 4 (TSK-401 100-account benchmark).
-**Full raw evidence:** `docs/memory.md` §5 ("Live Testing Findings": Test A, Incident 5, Test B)
+**Date:** 2026-10-07, updated 2026-10-08, updated 2026-10-10
+**Status:** Open, not fully isolated. Still must be resolved (and NFR-1 re-benchmarked) before treating Sprint 4 as done.
+**2026-10-10 update:** item 3 below (dump the raw dialog text) is now implemented as `--debug-dump`/the GUI's "Save debug captures" checkbox, and the GUI no longer silently ignores widened timeouts the way it did for Test C's runs — see `docs/memory.md` §6 for the full write-up, including a new, more concerning finding (§6.2 point 4: a suspiciously identical "October 2025" join date parsed for dozens of unrelated accounts, not yet explained).
+**Full raw evidence:** `docs/memory.md` §5-6 ("Live Testing Findings": Test A, Incident 5, Test B, Test C)
 
 ---
 

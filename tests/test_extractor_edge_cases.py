@@ -15,16 +15,28 @@ from __future__ import annotations
 import asyncio
 from typing import Optional
 
+import pytest
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+
 from src.core.ban_engine import STATUS_ACTIVE, STATUS_NOT_FOUND
-from src.core.extractors import extract_instagram, extract_threads
+from src.core.extractors import _safe_click, extract_instagram, extract_threads
 
 
 class FakeLocator:
-    """Stands in for a Playwright ``Locator``; ``hits`` controls ``count()``."""
+    """Stands in for a Playwright ``Locator``; ``hits`` controls ``count()``.
 
-    def __init__(self, hits: int = 0) -> None:
+    ``click_failures`` lets a test simulate Playwright's own click action
+    hanging/failing N times before succeeding (or never), independent of
+    ``count()``/``is_visible()`` -- this is what `_safe_click` falls back
+    through, seen live as "Locator.click: Timeout ... Call log:" errors.
+    """
+
+    def __init__(self, hits: int = 0, click_failures: int = 0) -> None:
         self.hits = hits
         self.clicked = False
+        self.evaluated = False
+        self.click_failures = click_failures
+        self.click_calls: list[tuple[Optional[int], bool]] = []
 
     async def count(self) -> int:
         return self.hits
@@ -32,7 +44,15 @@ class FakeLocator:
     async def is_visible(self) -> bool:
         return self.hits > 0
 
-    async def click(self) -> None:
+    async def click(self, timeout: Optional[int] = None, force: bool = False) -> None:
+        self.click_calls.append((timeout, force))
+        if self.click_failures > 0:
+            self.click_failures -= 1
+            raise PlaywrightTimeoutError("Locator.click: Timeout 5000ms exceeded.\nCall log:\n  - waiting")
+        self.clicked = True
+
+    async def evaluate(self, _script: str) -> None:
+        self.evaluated = True
         self.clicked = True
 
     async def bounding_box(self) -> Optional[dict]:
@@ -146,3 +166,120 @@ def test_extract_threads_not_found_for_account_with_no_threads_presence() -> Non
     result = asyncio.run(extract_threads(page, "someuser"))
     assert result["status"] == STATUS_NOT_FOUND
     assert result["error"] is None
+
+
+# ---- _safe_click's 3-stage fallback (2026-10-10 live test findings) ------- #
+#
+# Live testing found Threads' options SVG sometimes hangs a plain .click()
+# for Playwright's ~30s default actionability timeout, surfacing as a raw
+# "Locator.click: Timeout ... Call log:" error dumped straight into the UI.
+# _safe_click bounds each stage and falls back: plain click -> force click ->
+# a raw JS click.
+
+def test_safe_click_succeeds_on_first_try() -> None:
+    locator = FakeLocator(click_failures=0)
+    asyncio.run(_safe_click(locator))
+    assert locator.clicked and not locator.evaluated
+    assert locator.click_calls == [(5_000, False)]
+
+
+def test_safe_click_falls_back_to_forced_click() -> None:
+    """A plain click that times out once must be retried with force=True, not abandoned."""
+    locator = FakeLocator(click_failures=1)
+    asyncio.run(_safe_click(locator))
+    assert locator.clicked and not locator.evaluated
+    assert locator.click_calls == [(5_000, False), (5_000, True)]
+
+
+def test_safe_click_falls_back_to_js_click_when_both_time_out() -> None:
+    """If even a forced click hangs, a raw JS click must still complete the action."""
+    locator = FakeLocator(click_failures=2)
+    asyncio.run(_safe_click(locator))
+    assert locator.clicked and locator.evaluated
+    assert locator.click_calls == [(5_000, False), (5_000, True)]
+
+
+def test_safe_click_never_takes_the_full_default_playwright_timeout() -> None:
+    """Regression guard for the live-observed 34-40s hangs: each click attempt must be
+    bounded well under Playwright's own ~30s default actionability timeout."""
+    import src.core.extractors as extractors_module
+
+    assert extractors_module.CLICK_ACTION_TIMEOUT_MS < 30_000
+
+
+# ---- debug capture (ISSUE_concurrent_session_detection.md §5 item 3) ------ #
+
+class _RecordingLocator:
+    """Fake locator that always resolves to one fixed dialog text."""
+
+    def __init__(self, text: str) -> None:
+        self._text = text
+
+    async def count(self) -> int:
+        return 1
+
+    def nth(self, _index: int) -> "_RecordingLocator":
+        return self
+
+    async def inner_text(self, timeout: int = 1_000) -> str:
+        return self._text
+
+
+class _RecordingDialogPage:
+    """Fake page whose dialog selector always resolves to `_RecordingLocator`."""
+
+    def __init__(self, text: str) -> None:
+        self._text = text
+
+    def locator(self, _selector: str) -> _RecordingLocator:
+        return _RecordingLocator(self._text)
+
+
+def test_poll_dialog_calls_debug_sink_with_every_text_seen() -> None:
+    from src.core.extractors import _poll_dialog
+
+    seen: list[str] = []
+    page = _RecordingDialogPage("Date joined\nMarch 2015\nAccount based in\nTurkey")
+    result = asyncio.run(
+        _poll_dialog(page, ("div[role='dialog']",), dialog_timeout_s=1.0, debug_sink=seen.append)
+    )
+    assert result["date_joined"] == "March 2015" and result["country"] == "Turkey"
+    assert seen == ["Date joined\nMarch 2015\nAccount based in\nTurkey"]
+
+
+def test_write_debug_dump_writes_a_file(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import src.core.extractors as extractors_module
+
+    monkeypatch.setattr(extractors_module, "DEBUG_DIR", tmp_path / "debug")
+    extractors_module._write_debug_dump("ig", "someuser", ["Date joined\nMarch 2015"])
+    files = list((tmp_path / "debug").glob("ig_someuser_*.txt"))
+    assert len(files) == 1
+    assert "March 2015" in files[0].read_text(encoding="utf-8")
+
+
+def test_write_debug_dump_does_nothing_for_empty_texts(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import src.core.extractors as extractors_module
+
+    monkeypatch.setattr(extractors_module, "DEBUG_DIR", tmp_path / "debug")
+    extractors_module._write_debug_dump("ig", "someuser", [])
+    assert not (tmp_path / "debug").exists()
+
+
+# ---- short, human-readable error messages (2026-10-10 live test findings) #
+#
+# A raw Playwright exception's str() is multi-line ("...Timeout ...\nCall
+# log:\n  - waiting for ..."), which was showing up verbatim in the live
+# table's Error column, wrapping rows across multiple lines. `_short_error`
+# keeps only the first line.
+
+def test_short_error_drops_playwrights_multiline_call_log() -> None:
+    from src.core.extractors import _short_error
+
+    exc = PlaywrightTimeoutError("Locator.click: Timeout 5000ms exceeded.\nCall log:\n  - waiting for element")
+    assert _short_error("Threads error", exc) == "Threads error: Locator.click: Timeout 5000ms exceeded."
+
+
+def test_short_error_handles_an_exception_with_no_message() -> None:
+    from src.core.extractors import _short_error
+
+    assert _short_error("IG error", PlaywrightTimeoutError("")) == "IG error: TimeoutError"

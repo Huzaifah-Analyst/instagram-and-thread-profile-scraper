@@ -25,6 +25,23 @@ COLUMNS = (
     ("error", "Error", 160, "w"),
 )
 _STYLE = "MetaInspector.Treeview"
+_ERROR_CELL_MAX_CHARS = 200
+
+
+def _error_cell(error_message: object) -> str:
+    """Collapses an error message to one line, truncated, for the live table.
+
+    `extractors.py`'s `_short_error` already keeps new error messages to one
+    line, but this is a second line of defence: a multi-line value here (seen
+    live on 2026-10-10 from a raw Playwright exception, before that fix) would
+    otherwise make the Treeview row visually taller than every other row.
+    """
+    if not error_message:
+        return ""
+    text = " ".join(str(error_message).split())
+    if len(text) > _ERROR_CELL_MAX_CHARS:
+        text = text[: _ERROR_CELL_MAX_CHARS - 1] + "…"
+    return text
 
 
 def record_to_row(position: int, record: dict) -> tuple[str, ...]:
@@ -49,7 +66,7 @@ def record_to_row(position: int, record: dict) -> tuple[str, ...]:
         theme.cell(record.get("threads_country")),
         joined,
         f"{float(record.get('seconds') or 0):.1f}s",
-        record.get("error_message") or "",
+        _error_cell(record.get("error_message")),
     )
 
 

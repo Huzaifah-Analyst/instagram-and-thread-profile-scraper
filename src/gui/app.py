@@ -86,9 +86,13 @@ class MetaInspectorApp(ctk.CTk):
         self.setup_button.grid(row=0, column=2, padx=16, pady=12)
 
     def _default_factory(self, mode: str, callback: Callable[[int, int, dict], None]) -> MultiWorkerScraper:
-        """Creates the production scraper for one run, using the panel's worker count."""
-        return MultiWorkerScraper(profile_dir=self.profile_dir, mode=mode, headless=True,
-                                  workers=self.left_panel.workers, progress_callback=callback)
+        """Creates the production scraper for one run, using the panel's worker/timeout settings."""
+        return MultiWorkerScraper(
+            profile_dir=self.profile_dir, mode=mode, headless=True, workers=self.left_panel.workers,
+            dialog_timeout_s=self.left_panel.dialog_timeout_s,
+            menu_click_timeout_s=self.left_panel.menu_click_timeout_s,
+            debug_dump=self.left_panel.debug_dump, progress_callback=callback,
+        )
 
     # ------------------------------------------------------------------ #
     # Controls
