@@ -1,5 +1,7 @@
 """Unit tests for browser-free helpers in the core engine."""
 
+import asyncio
+
 import pytest
 
 from src.core.extractors import (
@@ -10,7 +12,13 @@ from src.core.extractors import (
     split_threads_joined,
 )
 from src.core.resource_blocker import should_block
-from src.core.scraper import build_record, chunk_usernames, clean_usernames, empty_platform_result
+from src.core.scraper import (
+    MultiWorkerScraper,
+    build_record,
+    chunk_usernames,
+    clean_usernames,
+    empty_platform_result,
+)
 
 
 # ---- resource blocker (TSK-101) ------------------------------------------- #
@@ -145,3 +153,34 @@ def test_build_record_links_ban_and_joins_errors() -> None:
     assert record["ig_country"] == "Turkey"
     assert record["error_message"] == "x"
     assert record["seconds"] == 3.14
+
+
+# ---- fail-safe abort on a checker-session challenge (TSK-403) ------------- #
+#
+# No live checker account was available to trigger a real challenge, so this
+# confirms the abort logic in `_worker` itself (mocked extractors, no browser)
+# rather than a real run under load, per docs/tasks.md TSK-403.
+
+def test_worker_stops_immediately_when_session_is_blocked(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    """A BLOCKED account must stop the run before any later account in its chunk runs."""
+    import src.core.scraper as scraper_module
+
+    seen: list[str] = []
+
+    async def fake_extract_instagram(_page, username: str, **_kwargs) -> dict:
+        seen.append(username)
+        if username == "flagged":
+            return {**empty_platform_result(), "status": "session_blocked", "error": "IG session blocked: test"}
+        return {**empty_platform_result(), "status": "active"}
+
+    monkeypatch.setattr(scraper_module, "extract_instagram", fake_extract_instagram)
+
+    scraper = MultiWorkerScraper(profile_dir=tmp_path, workers=1, mode="ig_only", min_delay=0, max_delay=0)
+    items = list(enumerate(["first", "flagged", "never_reached"]))
+    results: dict[int, dict] = {}
+    asyncio.run(scraper._worker(0, object(), items, results))
+
+    assert seen == ["first", "flagged"]  # the worker must not continue to "never_reached"
+    assert scraper.is_stopped
+    assert scraper.stop_reason is not None and "flagged" in scraper.stop_reason
+    assert results[1]["composite_status"] == "BLOCKED"

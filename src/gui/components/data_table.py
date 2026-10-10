@@ -79,9 +79,13 @@ class DataTable(ctk.CTkFrame):
             self.tree.tag_configure(status, foreground=fg, background=bg)
 
         scrollbar = ctk.CTkScrollbar(self, command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scrollbar.set)
-        self.tree.grid(row=1, column=0, sticky="nsew", padx=(14, 0), pady=(0, 14))
-        scrollbar.grid(row=1, column=1, sticky="ns", padx=(2, 8), pady=(0, 14))
+        # Columns total ~920px; at the 950px minimum window width (theme.WINDOW_MIN_SIZE)
+        # the table area is well under that, so a horizontal scrollbar is required too.
+        h_scrollbar = ctk.CTkScrollbar(self, orientation="horizontal", command=self.tree.xview)
+        self.tree.configure(yscrollcommand=scrollbar.set, xscrollcommand=h_scrollbar.set)
+        self.tree.grid(row=1, column=0, sticky="nsew", padx=(14, 0), pady=(0, 0))
+        scrollbar.grid(row=1, column=1, sticky="ns", padx=(2, 8), pady=(0, 0))
+        h_scrollbar.grid(row=2, column=0, sticky="ew", padx=(14, 0), pady=(2, 14))
 
         self._counts: dict[str, int] = {}
         self.records: list[dict] = []
