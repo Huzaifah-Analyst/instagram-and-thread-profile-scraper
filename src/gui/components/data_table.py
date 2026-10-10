@@ -22,6 +22,7 @@ COLUMNS = (
     ("threads_country", "Threads Country", 110, "w"),
     ("threads_joined", "Threads Joined", 125, "w"),
     ("duration", "Duration", 65, "e"),
+    ("error", "Error", 160, "w"),
 )
 _STYLE = "MetaInspector.Treeview"
 
@@ -48,6 +49,7 @@ def record_to_row(position: int, record: dict) -> tuple[str, ...]:
         theme.cell(record.get("threads_country")),
         joined,
         f"{float(record.get('seconds') or 0):.1f}s",
+        record.get("error_message") or "",
     )
 
 

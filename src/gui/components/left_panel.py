@@ -9,7 +9,7 @@ from typing import Callable
 
 import customtkinter as ctk
 
-from src.core.scraper import MODE_COMBINED, MODE_IG_ONLY, MODE_THREADS_ONLY, clean_usernames
+from src.core.scraper import DEFAULT_WORKERS, MODE_COMBINED, MODE_IG_ONLY, MODE_THREADS_ONLY, clean_usernames
 from src.gui import theme
 from src.gui.bridge import RunState
 
@@ -20,6 +20,7 @@ MODE_LABELS = (
     (MODE_IG_ONLY, "Instagram Only"),
     (MODE_THREADS_ONLY, "Threads Only"),
 )
+WORKER_CHOICES = ("1", "2", "3", "4", "5")
 
 
 class LeftPanel(ctk.CTkFrame):
@@ -76,15 +77,26 @@ class LeftPanel(ctk.CTkFrame):
             button.grid(row=row, column=0, sticky="w", padx=20, pady=3)
             self._mode_buttons.append(button)
 
+        workers_row = ctk.CTkFrame(self, fg_color="transparent")
+        workers_row.grid(row=7, column=0, sticky="ew", padx=16, pady=(12, 0))
+        ctk.CTkLabel(workers_row, text="Workers", font=theme.FONT_SECTION,
+                     text_color=theme.TEXT_PRIMARY).pack(side="left")
+        self.workers_var = ctk.StringVar(value=str(DEFAULT_WORKERS))
+        self.workers_menu = ctk.CTkOptionMenu(workers_row, values=list(WORKER_CHOICES),
+                                              variable=self.workers_var, width=70,
+                                              fg_color=theme.BG_ELEVATED, button_color=theme.BG_ELEVATED,
+                                              button_hover_color=theme.BORDER_COLOR)
+        self.workers_menu.pack(side="right")
+
         ctk.CTkLabel(self, text="Controls", font=theme.FONT_SECTION,
-                     text_color=theme.TEXT_PRIMARY).grid(row=7, column=0, sticky="w", padx=16, pady=(16, 6))
+                     text_color=theme.TEXT_PRIMARY).grid(row=8, column=0, sticky="w", padx=16, pady=(16, 6))
         self.start_button = ctk.CTkButton(self, text="▶  Start Checking", command=on_start, height=38,
                                           fg_color=theme.ACCENT_BLUE, hover_color=theme.ACCENT_HOVER,
                                           font=theme.FONT_SECTION)
-        self.start_button.grid(row=8, column=0, sticky="ew", padx=16)
+        self.start_button.grid(row=9, column=0, sticky="ew", padx=16)
 
         row_frame = ctk.CTkFrame(self, fg_color="transparent")
-        row_frame.grid(row=9, column=0, sticky="ew", padx=16, pady=(8, 16))
+        row_frame.grid(row=10, column=0, sticky="ew", padx=16, pady=(8, 16))
         row_frame.grid_columnconfigure((0, 1), weight=1)
         self.pause_button = ctk.CTkButton(row_frame, text="❚❚  Pause", command=on_pause_toggle,
                                           fg_color=theme.BG_ELEVATED, hover_color=theme.BORDER_COLOR,
@@ -106,6 +118,11 @@ class LeftPanel(ctk.CTkFrame):
         """Selected checking mode."""
         return self.mode_var.get()
 
+    @property
+    def workers(self) -> int:
+        """Selected worker count (1 to 5), so a 1-worker run can be tested from the GUI."""
+        return int(self.workers_var.get())
+
     def apply_state(self, state: RunState, start_allowed: bool = True) -> None:
         """Enables/disables controls for the given run state.
 
@@ -125,6 +142,7 @@ class LeftPanel(ctk.CTkFrame):
         self.import_button.configure(state=input_state)
         for button in self._mode_buttons:
             button.configure(state=input_state)
+        self.workers_menu.configure(state=input_state)
 
     def _import_file(self) -> None:
         """Loads a .txt file of usernames into the textbox."""

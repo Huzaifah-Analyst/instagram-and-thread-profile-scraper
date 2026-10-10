@@ -34,7 +34,13 @@ from src.core.ban_engine import (
     STATUS_SESSION_BLOCKED,
     BanLinkEngine,
 )
-from src.core.extractors import extract_instagram, extract_threads
+from src.core.extractors import (
+    DIALOG_TIMEOUT_S,
+    MENU_CLICK_TIMEOUT_S,
+    PAGE_READY_TIMEOUT_S,
+    extract_instagram,
+    extract_threads,
+)
 from src.core.resource_blocker import BlockerStats, attach_resource_blocker
 
 logger = logging.getLogger(__name__)
@@ -140,6 +146,9 @@ class MultiWorkerScraper:
         headless: bool = True,
         min_delay: float = 4.0,
         max_delay: float = 8.0,
+        page_ready_timeout_s: float = PAGE_READY_TIMEOUT_S,
+        dialog_timeout_s: float = DIALOG_TIMEOUT_S,
+        menu_click_timeout_s: float = MENU_CLICK_TIMEOUT_S,
         progress_callback: Optional[ProgressCallback] = None,
     ) -> None:
         """Configures the scraper.
@@ -151,6 +160,14 @@ class MultiWorkerScraper:
             headless: Run Chromium without a visible window.
             min_delay: Minimum pause between accounts on one worker (seconds).
             max_delay: Maximum pause between accounts on one worker (seconds).
+            page_ready_timeout_s: How long an extractor waits for a profile page
+                to become classifiable. The default was sized against solo-page
+                timing; widen it to test whether concurrent-worker load needs a
+                larger budget (see `docs/ISSUE_concurrent_session_detection.md`).
+            dialog_timeout_s: How long an extractor waits for the transparency
+                dialog/panel to render parseable text.
+            menu_click_timeout_s: How long an extractor waits for a menu item
+                to appear before clicking it.
             progress_callback: Called as ``(done, total, record)`` after each account.
                 It runs on the scraper's event-loop thread, so GUI code should
                 hand the record to a queue rather than touch widgets directly.
@@ -165,6 +182,9 @@ class MultiWorkerScraper:
         self.headless = headless
         self.min_delay = min_delay
         self.max_delay = max_delay
+        self.page_ready_timeout_s = page_ready_timeout_s
+        self.dialog_timeout_s = dialog_timeout_s
+        self.menu_click_timeout_s = menu_click_timeout_s
         self.progress_callback = progress_callback
         self.blocker_stats: list[BlockerStats] = []
         self.stop_reason: Optional[str] = None
@@ -278,14 +298,19 @@ class MultiWorkerScraper:
         t0 = time.monotonic()
         ig = empty_platform_result()
         threads = empty_platform_result()
+        timeout_kwargs = {
+            "page_ready_timeout_s": self.page_ready_timeout_s,
+            "dialog_timeout_s": self.dialog_timeout_s,
+            "menu_click_timeout_s": self.menu_click_timeout_s,
+        }
         try:
             if self.mode in (MODE_IG_ONLY, MODE_COMBINED):
-                ig = await extract_instagram(page, username)
+                ig = await extract_instagram(page, username, **timeout_kwargs)
             # Combined mode: a missing IG account has no Threads profile, and a
             # blocked session must not keep hitting Meta.
             skip_threads = self.mode == MODE_COMBINED and ig["status"] in (STATUS_NOT_FOUND, STATUS_SESSION_BLOCKED)
             if self.mode in (MODE_THREADS_ONLY, MODE_COMBINED) and not skip_threads:
-                threads = await extract_threads(page, username)
+                threads = await extract_threads(page, username, **timeout_kwargs)
         except PlaywrightError as exc:
             logger.error("Unexpected browser error for @%s: %s", username, exc)
             failed = {**empty_platform_result(), "status": STATUS_ERROR, "error": f"Browser error: {exc}"}
@@ -340,6 +365,14 @@ def main() -> None:
     parser.add_argument("--profile", type=Path, default=DEFAULT_PROFILE_DIR)
     parser.add_argument("--headed", action="store_true", help="Show the browser windows")
     parser.add_argument("--login", action="store_true", help="Open a browser for one-time login")
+    parser.add_argument("--page-ready-timeout", type=float, default=PAGE_READY_TIMEOUT_S,
+                        help="Seconds to wait for a profile page to become classifiable "
+                             "(widen this under concurrent-worker load; see "
+                             "docs/ISSUE_concurrent_session_detection.md)")
+    parser.add_argument("--dialog-timeout", type=float, default=DIALOG_TIMEOUT_S,
+                        help="Seconds to wait for the transparency dialog/panel to render")
+    parser.add_argument("--menu-click-timeout", type=float, default=MENU_CLICK_TIMEOUT_S,
+                        help="Seconds to wait for a menu item to appear before clicking it")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -358,7 +391,8 @@ def main() -> None:
         parser.error("give usernames or --file")
 
     scraper = MultiWorkerScraper(profile_dir=args.profile, workers=args.workers, mode=args.mode,
-                                 headless=not args.headed)
+                                 headless=not args.headed, page_ready_timeout_s=args.page_ready_timeout,
+                                 dialog_timeout_s=args.dialog_timeout, menu_click_timeout_s=args.menu_click_timeout)
     t0 = time.monotonic()
     records = scraper.run(names)
     elapsed = time.monotonic() - t0

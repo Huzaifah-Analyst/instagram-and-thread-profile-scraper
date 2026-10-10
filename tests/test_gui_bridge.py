@@ -213,7 +213,15 @@ def test_record_to_row() -> None:
               "ig_date_joined": "Sep 2026", "threads_date_joined": "Sep 2026", "threads_badge": "100M+",
               "seconds": 2.44}
     assert record_to_row(1, record) == ("01", "@elif", "ACTIVE", "Turkey", "Sep 2026", "N/A",
-                                        "Sep 2026 · 100M+", "2.4s")
+                                        "Sep 2026 · 100M+", "2.4s", "")
+
+
+def test_record_to_row_surfaces_error_message() -> None:
+    """An operator must be able to see *why* a row has no data (ISSUE_concurrent_session_detection.md)."""
+    record = {"username": "elif", "composite_status": "ACTIVE", "ig_status": "active",
+              "seconds": 8.1, "error_message": "IG about dialog did not load within timeout"}
+    row = record_to_row(1, record)
+    assert row[-1] == "IG about dialog did not load within timeout"
 
 
 def test_eta_and_duration() -> None:
@@ -224,6 +232,25 @@ def test_eta_and_duration() -> None:
 
 
 # ---- GUI smoke test ------------------------------------------------------- #
+
+def test_gui_worker_count_is_not_hardcoded(tmp_path: Path) -> None:
+    """A 1-worker run must be selectable from the GUI, not only via the CLI --workers flag."""
+    from src.gui.app import MetaInspectorApp
+
+    try:
+        app = MetaInspectorApp(profile_dir=tmp_path)
+    except tk.TclError as exc:
+        pytest.skip(f"No display available: {exc}")
+    try:
+        app.withdraw()
+        assert app.left_panel.workers == 5  # default matches MultiWorkerScraper's DEFAULT_WORKERS
+        app.left_panel.workers_var.set("1")
+        assert app.left_panel.workers == 1
+        scraper = app._default_factory("combined", lambda *_: None)
+        assert scraper.workers == 1
+    finally:
+        app.destroy()
+
 
 def test_app_runs_a_fake_check_end_to_end(tmp_path: Path) -> None:
     """Builds the real window, starts a run via the Start button and checks the table fills."""

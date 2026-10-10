@@ -37,6 +37,7 @@ THREADS_URL = "https://www.threads.com/@{username}"
 NAVIGATION_TIMEOUT_MS = 30_000
 PAGE_READY_TIMEOUT_S = 8.0
 DIALOG_TIMEOUT_S = 8.0
+MENU_CLICK_TIMEOUT_S = 4.0
 POLL_INTERVAL_S = 0.25
 
 # Label lines in the transparency dialogs (compared lower-cased, exact line).
@@ -171,13 +172,17 @@ async def _body_text(page: Page) -> str:
         return ""
 
 
-async def _open_profile(page: Page, url: str, ready_selector: str) -> str:
+async def _open_profile(
+    page: Page, url: str, ready_selector: str, page_ready_timeout_s: float = PAGE_READY_TIMEOUT_S
+) -> str:
     """Navigates to a profile and polls until it is classifiable.
 
     Args:
         page: Worker page.
         url: Profile URL.
         ready_selector: Selector that indicates the profile header has rendered.
+        page_ready_timeout_s: How long to poll before giving up (seconds). Widened
+            under concurrent load per `docs/ISSUE_concurrent_session_detection.md`.
 
     Returns:
         The body text at the moment the page became classifiable (or timed out).
@@ -187,7 +192,7 @@ async def _open_profile(page: Page, url: str, ready_selector: str) -> str:
     except PlaywrightTimeoutError:
         logger.warning("Navigation timeout for %s, continuing with partial page", url)
 
-    deadline = time.monotonic() + PAGE_READY_TIMEOUT_S
+    deadline = time.monotonic() + page_ready_timeout_s
     body = ""
     while time.monotonic() < deadline:
         body = await _body_text(page)
@@ -212,13 +217,20 @@ async def _first_visible(candidates: list[Locator]) -> Optional[Locator]:
     return None
 
 
-async def _click_menu_item(page: Page, texts: tuple[str, ...]) -> bool:
+async def _click_menu_item(
+    page: Page, texts: tuple[str, ...], timeout_s: float = MENU_CLICK_TIMEOUT_S
+) -> bool:
     """Waits for a menu item with any of ``texts`` and clicks it.
+
+    Args:
+        page: Worker page.
+        texts: Candidate menu item labels to match.
+        timeout_s: How long to poll before giving up (seconds).
 
     Returns:
         ``True`` if an item was clicked.
     """
-    deadline = time.monotonic() + 4.0
+    deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         candidates = [page.get_by_text(t, exact=True).last for t in texts]
         item = await _first_visible(candidates)
@@ -229,7 +241,12 @@ async def _click_menu_item(page: Page, texts: tuple[str, ...]) -> bool:
     return False
 
 
-async def _poll_dialog(page: Page, container_selectors: tuple[str, ...], max_chars: int = 2_000) -> dict:
+async def _poll_dialog(
+    page: Page,
+    container_selectors: tuple[str, ...],
+    max_chars: int = 2_000,
+    dialog_timeout_s: float = DIALOG_TIMEOUT_S,
+) -> dict:
     """Polls the transparency dialog until a date or country is parsed.
 
     Args:
@@ -237,12 +254,13 @@ async def _poll_dialog(page: Page, container_selectors: tuple[str, ...], max_cha
         container_selectors: Selectors that may hold the dialog content.
         max_chars: Containers with longer text are skipped, so broad fallback
             selectors cannot match the whole page (and a bio line).
+        dialog_timeout_s: How long to poll before giving up (seconds).
 
     Returns:
         Parsed dict from ``parse_about_dialog`` (all ``None`` on timeout).
     """
     empty = {"date_joined": None, "join_badge": None, "country": None}
-    deadline = time.monotonic() + DIALOG_TIMEOUT_S
+    deadline = time.monotonic() + dialog_timeout_s
     while time.monotonic() < deadline:
         for selector in container_selectors:
             dialogs = page.locator(selector)
@@ -287,12 +305,26 @@ def _result(**fields: object) -> dict:
 # Instagram (TSK-102)
 # --------------------------------------------------------------------------- #
 
-async def extract_instagram(page: Page, username: str) -> dict:
+async def extract_instagram(
+    page: Page,
+    username: str,
+    page_ready_timeout_s: float = PAGE_READY_TIMEOUT_S,
+    dialog_timeout_s: float = DIALOG_TIMEOUT_S,
+    menu_click_timeout_s: float = MENU_CLICK_TIMEOUT_S,
+) -> dict:
     """Checks an Instagram profile and reads its transparency data.
 
     Args:
         page: Worker page from a logged-in persistent context.
         username: Instagram username without ``@``.
+        page_ready_timeout_s: How long to wait for the profile page to become
+            classifiable. Configurable so it can be widened under concurrent
+            worker load without a code change; see
+            `docs/ISSUE_concurrent_session_detection.md`.
+        dialog_timeout_s: How long to wait for the "About this account" dialog
+            to render enough text to parse.
+        menu_click_timeout_s: How long to wait for a menu item to appear before
+            clicking it.
 
     Returns:
         Dict with ``status``, ``date_joined``, ``country``, ``seconds`` and ``error``.
@@ -301,7 +333,10 @@ async def extract_instagram(page: Page, username: str) -> dict:
     res = _result()
     try:
         # "header h2" is the profile username; a bare <header> also exists on error pages.
-        body = await _open_profile(page, INSTAGRAM_URL.format(username=username), "header h2, header h1")
+        body = await _open_profile(
+            page, INSTAGRAM_URL.format(username=username), "header h2, header h1",
+            page_ready_timeout_s=page_ready_timeout_s,
+        )
 
         challenge = detect_session_challenge(page.url, body)
         if challenge:
@@ -324,11 +359,11 @@ async def extract_instagram(page: Page, username: str) -> dict:
             return res
         await options.click()
 
-        if not await _click_menu_item(page, ABOUT_IG_TEXTS):
+        if not await _click_menu_item(page, ABOUT_IG_TEXTS, timeout_s=menu_click_timeout_s):
             res["error"] = "IG 'About this account' option not found"
             return res
 
-        parsed = await _poll_dialog(page, ("div[role='dialog']",))
+        parsed = await _poll_dialog(page, ("div[role='dialog']",), dialog_timeout_s=dialog_timeout_s)
         res.update(date_joined=parsed["date_joined"], country=parsed["country"])
         if not (parsed["date_joined"] or parsed["country"]):
             res["error"] = "IG about dialog did not load within timeout"
@@ -371,12 +406,26 @@ async def _find_threads_menu_button(page: Page) -> Optional[Locator]:
     return clickable if await clickable.count() else svg
 
 
-async def extract_threads(page: Page, username: str) -> dict:
+async def extract_threads(
+    page: Page,
+    username: str,
+    page_ready_timeout_s: float = PAGE_READY_TIMEOUT_S,
+    dialog_timeout_s: float = DIALOG_TIMEOUT_S,
+    menu_click_timeout_s: float = MENU_CLICK_TIMEOUT_S,
+) -> dict:
     """Checks a Threads profile and reads its transparency data.
 
     Args:
         page: Worker page from a logged-in persistent context.
         username: Threads username without ``@``.
+        page_ready_timeout_s: How long to wait for the profile page to become
+            classifiable. Configurable so it can be widened under concurrent
+            worker load without a code change; see
+            `docs/ISSUE_concurrent_session_detection.md`.
+        dialog_timeout_s: How long to wait for the "About this profile" panel
+            to render enough text to parse.
+        menu_click_timeout_s: How long to wait for a menu item to appear before
+            clicking it.
 
     Returns:
         Dict with ``status``, ``date_joined``, ``join_badge``, ``country``,
@@ -386,7 +435,8 @@ async def extract_threads(page: Page, username: str) -> dict:
     res = _result()
     try:
         body = await _open_profile(
-            page, THREADS_URL.format(username=username), "div[aria-label='Column body'] h1, div[role='main'] h1"
+            page, THREADS_URL.format(username=username), "div[aria-label='Column body'] h1, div[role='main'] h1",
+            page_ready_timeout_s=page_ready_timeout_s,
         )
 
         challenge = detect_session_challenge(page.url, body)
@@ -406,13 +456,16 @@ async def extract_threads(page: Page, username: str) -> dict:
             return res
         await menu.click()
 
-        if not await _click_menu_item(page, ABOUT_THREADS_TEXTS):
+        if not await _click_menu_item(page, ABOUT_THREADS_TEXTS, timeout_s=menu_click_timeout_s):
             res["error"] = "Threads 'About this profile' option not found"
             return res
 
         # Threads sometimes renders the panel without role=dialog; fall back to
         # the smallest container holding the "Based in" label.
-        parsed = await _poll_dialog(page, ("div[role='dialog']", "div:has-text('Based in')"), max_chars=400)
+        parsed = await _poll_dialog(
+            page, ("div[role='dialog']", "div:has-text('Based in')"), max_chars=400,
+            dialog_timeout_s=dialog_timeout_s,
+        )
         res.update(parsed)
         if not (parsed["date_joined"] or parsed["country"]):
             res["error"] = "Threads about panel did not load within timeout"

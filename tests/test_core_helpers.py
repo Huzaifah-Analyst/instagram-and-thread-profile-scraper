@@ -116,6 +116,26 @@ def test_clean_usernames() -> None:
     assert clean_usernames([" @Alice ", "bob", "", "alice", "bob\n"]) == ["Alice", "bob"]
 
 
+def test_scraper_defaults_match_extractor_timeouts(tmp_path) -> None:
+    """Defaults stay the current extractor budgets; see ISSUE_concurrent_session_detection.md."""
+    from src.core import extractors
+    from src.core.scraper import MultiWorkerScraper
+
+    scraper = MultiWorkerScraper(profile_dir=tmp_path)
+    assert scraper.page_ready_timeout_s == extractors.PAGE_READY_TIMEOUT_S
+    assert scraper.dialog_timeout_s == extractors.DIALOG_TIMEOUT_S
+    assert scraper.menu_click_timeout_s == extractors.MENU_CLICK_TIMEOUT_S
+
+
+def test_scraper_timeouts_are_configurable_without_a_code_change(tmp_path) -> None:
+    """Huzaifah must be able to widen timeouts for a concurrent-load test via a constructor arg."""
+    from src.core.scraper import MultiWorkerScraper
+
+    scraper = MultiWorkerScraper(profile_dir=tmp_path, page_ready_timeout_s=16.0,
+                                 dialog_timeout_s=16.0, menu_click_timeout_s=8.0)
+    assert (scraper.page_ready_timeout_s, scraper.dialog_timeout_s, scraper.menu_click_timeout_s) == (16.0, 16.0, 8.0)
+
+
 def test_build_record_links_ban_and_joins_errors() -> None:
     ig = {**empty_platform_result(), "status": "active", "country": "Turkey"}
     threads = {**empty_platform_result(), "status": "suspended", "error": "x"}
