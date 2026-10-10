@@ -1,0 +1,70 @@
+﻿{"case": "source_inventory", "observed": {"file": "checker_test/analyze_requests.py", "lines": 20, "imports": ["json"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/capture_network_exact.py", "lines": 76, "imports": ["config", "json", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": [34]}}
+{"case": "source_inventory", "observed": {"file": "checker_test/check_usernames.py", "lines": 111, "imports": [], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/click_and_inspect.py", "lines": 81, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/config.py", "lines": 23, "imports": ["os", "pathlib"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/debug_failures.py", "lines": 87, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/dump_svgs.py", "lines": 40, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": [23, 34]}}
+{"case": "source_inventory", "observed": {"file": "checker_test/extract_both.py", "lines": 96, "imports": ["config", "json", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/extract_doc_ids.py", "lines": 22, "imports": ["json", "urllib.parse"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/fast_checker.py", "lines": 98, "imports": ["config", "json", "pandas", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/find_paths.py", "lines": 22, "imports": ["json"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/find_threads_tag.py", "lines": 41, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": [35]}}
+{"case": "source_inventory", "observed": {"file": "checker_test/get_dom_and_click.py", "lines": 108, "imports": ["config", "json", "os", "playwright.sync_api", "sys", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/get_loaded_about_data.py", "lines": 96, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/get_threads_about_content.py", "lines": 56, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/inspect_elements.py", "lines": 134, "imports": ["config", "json", "pathlib", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": [31, 96]}}
+{"case": "source_inventory", "observed": {"file": "checker_test/inspect_json_keys.py", "lines": 26, "imports": ["json", "pathlib"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/inspect_threads_header_svgs.py", "lines": 47, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/log_all_requests.py", "lines": 84, "imports": ["config", "json", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": [38, 28]}}
+{"case": "source_inventory", "observed": {"file": "checker_test/main.py", "lines": 478, "imports": ["config", "os", "pandas", "pathlib", "playwright.sync_api", "random", "sys", "time", "traceback"], "october_literal": false, "silent_handlers": [95, 114, 197, 256]}}
+{"case": "source_inventory", "observed": {"file": "checker_test/sniff_exact_api.py", "lines": 85, "imports": ["config", "json", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": [48]}}
+{"case": "source_inventory", "observed": {"file": "checker_test/step0_verify.py", "lines": 344, "imports": ["config", "json", "os", "playwright.sync_api", "re", "sys", "time", "urllib.parse"], "october_literal": false, "silent_handlers": [47, 211, 238, 45]}}
+{"case": "source_inventory", "observed": {"file": "checker_test/test_about_click.py", "lines": 104, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": [29]}}
+{"case": "source_inventory", "observed": {"file": "checker_test/test_circle_selector.py", "lines": 50, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/test_edge_cases.py", "lines": 55, "imports": ["config", "main", "pandas", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/test_modal_extraction.py", "lines": 115, "imports": ["config", "json", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": [30]}}
+{"case": "source_inventory", "observed": {"file": "checker_test/test_reliable_extraction.py", "lines": 118, "imports": ["config", "playwright.sync_api", "sys", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/test_svg_index.py", "lines": 50, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/test_threads_deep.py", "lines": 74, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": [66]}}
+{"case": "source_inventory", "observed": {"file": "checker_test/test_threads_dispatch.py", "lines": 55, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/test_threads_exact.py", "lines": 57, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/test_threads_profile_menu.py", "lines": 48, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/test_threads_svg.py", "lines": 56, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/test_wait.py", "lines": 86, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/test_zeynep.py", "lines": 36, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/threads_check_20.py", "lines": 41, "imports": ["config", "pandas", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "checker_test/verify_threads_exact_fix.py", "lines": 61, "imports": ["config", "playwright.sync_api", "time"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "main.py", "lines": 51, "imports": ["os", "pathlib", "src.gui.app", "sys"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "src/__init__.py", "lines": 1, "imports": [], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "src/core/__init__.py", "lines": 1, "imports": [], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "src/core/ban_engine.py", "lines": 85, "imports": ["__future__", "typing"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "src/core/extractors.py", "lines": 572, "imports": ["__future__", "asyncio", "datetime", "logging", "pathlib", "playwright.async_api", "re", "src.core.ban_engine", "time", "typing", "urllib.parse"], "october_literal": false, "silent_handlers": [485, 283]}}
+{"case": "source_inventory", "observed": {"file": "src/core/resource_blocker.py", "lines": 78, "imports": ["__future__", "dataclasses", "logging", "playwright.async_api", "typing", "urllib.parse"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "src/core/scraper.py", "lines": 419, "imports": ["__future__", "argparse", "asyncio", "json", "logging", "pathlib", "playwright.async_api", "random", "src.core.ban_engine", "src.core.extractors", "src.core.resource_blocker", "sys", "threading", "time", "typing"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "src/core/session.py", "lines": 78, "imports": ["__future__", "datetime", "logging", "pathlib", "shutil", "sqlite3", "tempfile", "typing"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "src/gui/__init__.py", "lines": 1, "imports": [], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "src/gui/app.py", "lines": 232, "imports": ["__future__", "asyncio", "customtkinter", "logging", "pathlib", "src.core.scraper", "src.core.session", "src.gui", "src.gui.bridge", "src.gui.components.data_table", "src.gui.components.left_panel", "src.gui.components.status_bar", "threading", "typing"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "src/gui/bridge.py", "lines": 190, "imports": ["__future__", "dataclasses", "enum", "logging", "queue", "threading", "time", "typing"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "src/gui/components/__init__.py", "lines": 1, "imports": [], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "src/gui/components/data_table.py", "lines": 138, "imports": ["__future__", "customtkinter", "src.gui", "tkinter"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "src/gui/components/left_panel.py", "lines": 220, "imports": ["__future__", "customtkinter", "logging", "pathlib", "src.core.extractors", "src.core.scraper", "src.gui", "src.gui.bridge", "tkinter", "typing"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "src/gui/components/status_bar.py", "lines": 51, "imports": ["__future__", "customtkinter", "src.gui", "typing"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "src/gui/theme.py", "lines": 80, "imports": ["__future__", "typing"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "tests/test_ban_engine.py", "lines": 71, "imports": ["pytest", "src.core.ban_engine"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "tests/test_core_helpers.py", "lines": 220, "imports": ["asyncio", "pytest", "src.core", "src.core.extractors", "src.core.resource_blocker", "src.core.scraper"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "tests/test_extractor_edge_cases.py", "lines": 285, "imports": ["__future__", "asyncio", "playwright.async_api", "pytest", "src.core.ban_engine", "src.core.extractors", "typing"], "october_literal": false, "silent_handlers": []}}
+{"case": "source_inventory", "observed": {"file": "tests/test_gui_bridge.py", "lines": 324, "imports": ["pathlib", "pytest", "sqlite3", "src.core.extractors", "src.core.scraper", "src.core.session", "src.gui", "src.gui.app", "src.gui.bridge", "src.gui.components.data_table", "threading", "time", "tkinter", "typing"], "october_literal": false, "silent_handlers": []}}
+{"case": "screenshot_transcription_and_display_match", "observed": ["China", "October 2025"]}
+{"case": "missing_value_accepts_next_label_as_date", "observed": {"date_joined": "Account based in", "join_badge": null, "country": "China"}}
+{"case": "logged_out_public_page_not_detected", "observed": null}
+{"case": "negative_poll_budgets_accepted", "observed": -1}
+{"case": "urls_and_spaces_accepted_as_usernames", "observed": ["https://www.instagram.com/example_user/", "a b"]}
+{"case": "hidden_dialog_selected_before_visible_target", "observed": {"date_joined": "October 2025", "join_badge": null, "country": "China"}}
+{"case": "first_dialog_not_bound_to_target_identity", "observed": {"date_joined": "October 2025", "join_badge": null, "country": "China"}}
+{"case": "poll_returns_on_first_field_before_later_content", "observed": {"returned": {"date_joined": "April 2016", "join_badge": null, "country": null}, "later_content": {"date_joined": "April 2016", "join_badge": null, "country": "Canada"}}}
+{"case": "ig_about_profile_menu_variant_not_matched", "observed": false}
+{"case": "last_hidden_duplicate_hides_visible_menu_candidate", "observed": false}
+{"case": "threads_rightmost_svg_can_select_unrelated_control", "observed": "unrelated"}
+{"case": "unclassified_error_page_returns_active", "observed": {"status": "active", "date_joined": null, "join_badge": null, "country": null, "seconds": 0.31, "error": "IG options (...) button not found"}}
+All 12 observation groups reproduced; this is NOT a product pass.
