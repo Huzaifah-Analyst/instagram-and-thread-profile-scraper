@@ -11,8 +11,9 @@ A high-performance Windows desktop application to verify account alive/banned st
   per-platform login preflight and a shared target queue.
 - Target identity checks, separate account status and extraction quality,
   checker attribution, full row details and opt-in local debug captures.
-- Immediate JSONL result retention in `results/`; passwords/2FA are entered in
-  official browser tabs, not stored in application configuration.
+- Immediate JSONL result retention in `results/`.
+- Optional account-file import with local authenticator codes and isolated
+  automatic login; passwords/2FA seeds are not saved in app configuration.
 
 One authenticated Combined extraction has been verified against raw dialogs;
 a later run failed during page/menu loading. Reliable five-account scaling and
@@ -29,6 +30,10 @@ python main.py
 Restart an older running app to load these changes. Open **Setup Checker Account**,
 log into both Instagram and Threads for each slot, close each login browser,
 select the slots and save. The **Checker limit** caps concurrent slots.
+For the supplied account file, choose **Import accounts & auto-login** in Setup
+and select `docs/accounts.txt` (`username|password|2FA secret`, up to five rows).
+Setup runs one account at a time, then the saved accounts can check in parallel.
+Complete any security prompt manually; close the browser and reimport to resume.
 See [step-by-step verification](docs/manual_verification.md) and the
 [actual test outcomes](docs/test_log.md). The old packaged executable has not
 been rebuilt with these changes.

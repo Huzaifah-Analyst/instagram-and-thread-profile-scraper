@@ -33,7 +33,13 @@ updated states. Reports: [checker pool](implementation/isolated-checker-pool.md)
 - Controlled 10-target batch launches were blocked twice by automatic
   permission-review timeouts; the batch did not execute. Five-account live
   operation and the 100-account performance requirement remain unverified.
-- **Final full suite: 113 passed in 13.51s, zero skips**, outside the sandbox.
+- Account-file automatic setup is implemented; see [report](implementation/account-file-auto-login.md).
+  This adds local authenticator codes and stable per-username sessions. Live
+  acceptance is tracked separately; importing five rows does not prove five logins.
+- First imported account passed live Instagram auto-login after a current-form
+  selector fix (P35). Threads remained unverified after its authenticator step;
+  setup stopped before the other four accounts (P36).
+- **Latest full suite: 153 passed in 26.68s, zero skips**, outside the sandbox.
   This includes real Tk widgets and real local Chromium DOM tests. Earlier Tcl
   environment failures and approval timeouts remain in the running test log.
 
@@ -163,3 +169,7 @@ individual test runs in test_log.md and task-method reports under implementation
 | --- | --- | --- |
 | P31 | Fixed and live rechecked | Initial live preflight used wait_for_function; Instagram CSP rejected string evaluation. Replaced with bounded locator text polling. Next Combined preflight completed IG and correctly detected Threads login required (23.2s). |
 | P32 | Fixed / exact live-text regression passes | Threads country explicitly says Not shared. Previously counted as Complete; source text is now preserved and classified as Partial when a joined date is available. Fresh post-fix live attempt failed earlier during loading, so live classification acceptance remains pending. See [report](implementation/threads-disclosure-quality.md). |
+| P33 | Implemented / automated coverage passes | Account file could not previously set up checker logins. Added full-file validation, memory-only password/seed handling, local TOTP and official-page login for IG/Threads. Manual challenges stop setup. Five-account live acceptance remains separate. See [report](implementation/account-file-auto-login.md). |
+| P34 | Preventive fix / automated coverage passes | Assigning imported sessions by slot number would mix accounts after a reordered import. Profile directories now follow stable username bindings; matching identity is required during setup and extraction preflight. Existing manual profiles are preserved. |
+| P35 | Fixed / live IG login verified | First automatic attempt could not find the current IG username field: `name=email`, `autocomplete=username webauthn`. Read-only control inspection pinpointed the mismatch. Added email-name and autocomplete-token selectors; next live attempt verified the first account on IG. See [report](implementation/account-file-auto-login.md). |
+| P36 | Open / live Threads authentication unverified | After IG succeeded, Threads submitted one authenticator code but no matching authenticated session was verified before timeout. Fresh read-only inspection still showed a login form and no Threads session cookie. It did not show an incorrect-code marker, so rejection, extra verification, or UI progression cannot yet be distinguished. Setup halted with 0/5 dual-platform accounts verified. Complete the first account manually in Setup and reimport; do not count the other four as tested. |

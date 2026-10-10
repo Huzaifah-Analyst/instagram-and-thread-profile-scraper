@@ -279,3 +279,22 @@ attempts timed out in automatic approval review before running. Final full suite
 passed outside the sandbox: **113 passed in 13.51s**, zero skips. The central
 problem log and task reports distinguish successful single-account transcription,
 remaining batch accuracy/performance work, and release packaging limitations.
+
+### 2026-10-10 - Account-file automatic setup
+
+The operator confirmed the five supplied rows contain permanent authenticator
+secrets. Added **Import accounts & auto-login**, strict pipe-separated parsing,
+local RFC 6238 codes, sequential IG/Threads setup and stable username-bound
+profiles. Only usernames/selections persist in app settings; password/seed
+values never enter status, diagnostics or exception text. Challenges and email/
+SMS steps stop setup for manual completion; existing sessions are reused on
+reimport. Imported identity is rechecked at extraction preflight. Full automated
+suite initially passed 151 tests; final suite after live-layout and identity
+hardening: **153 passed in 26.68s**, zero skips. Live inspection identified IG's
+`name=email` / `autocomplete=username webauthn` form; fixing its selector enabled
+the first imported account's IG login. Threads submitted one authenticator code
+but remained unverified; fresh read-only inspection confirmed no session cookie.
+Setup stopped before the other four accounts. P36 remains open for manual
+completion/diagnosis, and all five dual-platform logins are not claimed.
+See [account-file-auto-login.md](implementation/account-file-auto-login.md) and
+[manual_verification.md](manual_verification.md); P33-P36 track this work.

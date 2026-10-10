@@ -1,0 +1,55 @@
+...........................F....                                         [100%]
+================================== FAILURES ===================================
+_ test_manual_steps_never_receive_secrets[Confirm you\u2019re human<input name="username"><input type="password">-manual attention] _
+
+html = 'Confirm you�re human<input name="username"><input type="password">'
+reason = 'manual attention'
+
+    @pytest.mark.parametrize("html,reason", [
+        ('Code sent to your email<input autocomplete="one-time-code">', "manual entry"),
+        ('Confirm you are signing in. Text message<input name="verificationCode">', "manual entry"),
+        ('Confirm you�re human<input name="username"><input type="password">', "manual attention"),
+        ('Sorry, your password was incorrect<input name="username"><input type="password">', "rejected"),
+    ])
+    def test_manual_steps_never_receive_secrets(html: str, reason: str) -> None:
+        """Email/SMS, challenge and rejected login stop without another submission."""
+        async def check(page: Page) -> None:
+            """Inspect untouched form values after the safe stop."""
+            await page.route("**/*", lambda route: route.fulfill(body=html, content_type="text/html"))
+            result = await login_platform(page, "ig", ACCOUNT, threading.Event(), 2)
+            assert not result.ready and reason in result.message
+            assert await page.locator("input").evaluate_all("els => els.every(e => e.value === '')")
+>       browser_case(check)
+
+tests\test_login_flow.py:76:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_login_flow.py:28: in browser_case
+    asyncio.run(run())
+..\..\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py:195: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py:691: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+tests\test_login_flow.py:25: in run
+    await check(await browser.new_page())
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+page = <Page url='https://www.instagram.com/accounts/login/'>
+
+    async def check(page: Page) -> None:
+        """Inspect untouched form values after the safe stop."""
+        await page.route("**/*", lambda route: route.fulfill(body=html, content_type="text/html"))
+        result = await login_platform(page, "ig", ACCOUNT, threading.Event(), 2)
+>       assert not result.ready and reason in result.message
+E       AssertionError: assert (not False and 'manual attention' in 'Login submit control not recognized; finish in browser.')
+E        +  where False = LoginOutcome(platform='ig', ready=False, message='Login submit control not recognized; finish in browser.').ready
+E        +  and   'Login submit control not recognized; finish in browser.' = LoginOutcome(platform='ig', ready=False, message='Login submit control not recognized; finish in browser.').message
+
+tests\test_login_flow.py:74: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_login_flow.py::test_manual_steps_never_receive_secrets[Confirm you\u2019re human<input name="username"><input type="password">-manual attention]
+1 failed, 31 passed in 15.30s

@@ -355,3 +355,28 @@ def test_checker_manager_selection_reaches_production_factory(
     dialog = app._checker_dialog
     dialog._login(dialog.slots[3])
     assert requested[0].checker_id == "checker_4"
+
+
+def test_checker_import_validates_then_launches_bound_accounts(
+    gui_app: MetaInspectorApp, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The actual import dialog rejects bad input before touching selections."""
+    from src.gui.components import checker_dialog
+
+    requested = []
+    monkeypatch.setattr(gui_app, "_start_import_login", lambda *args: requested.append(args))
+    source = tmp_path / "accounts.txt"
+    source.write_text("invalid")
+    monkeypatch.setattr(checker_dialog.filedialog, "askopenfilename", lambda **_: str(source))
+    gui_app._on_setup()
+    dialog = gui_app._checker_dialog
+    dialog._import()
+    assert dialog.winfo_exists() and not requested
+    assert not gui_app.checker_store.path.exists()
+    source.write_text("alice|synthetic-password|JBSWY3DPEHPK3PXP")
+    dialog._import()
+    assert len(requested) == 1
+    accounts, checkers = requested[0]
+    assert accounts[0].username == checkers[0].username == "alice"
+    assert gui_app._default_factory("combined", lambda *_: None).checkers == checkers
+    assert "synthetic-password" not in gui_app.checker_store.path.read_text()

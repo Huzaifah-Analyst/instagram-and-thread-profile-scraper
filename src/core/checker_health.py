@@ -11,6 +11,7 @@ from playwright.async_api import Error as PlaywrightError
 from src.core.about_parser import detect_session_challenge
 from src.core.browser_helpers import _body_text
 from src.core.diagnostics import capture_page
+from src.core.login_flow import identity_matches
 
 logger = logging.getLogger(__name__)
 PLATFORM_URLS = {"ig": "https://www.instagram.com/", "threads": "https://www.threads.com/"}
@@ -46,13 +47,23 @@ async def verify_platform(page: Page, platform: str, debug_dump: bool = False) -
         return f"{platform} session could not be verified: {str(exc).splitlines()[0]}"
 
 
-async def verify_context(context: BrowserContext, mode: str, debug_dump: bool = False) -> dict[str, str | None]:
+async def verify_context(
+    context: BrowserContext, mode: str, debug_dump: bool = False,
+    expected_username: str | None = None,
+) -> dict[str, str | None]:
     """Check every requested platform before assigning any targets to a checker."""
     page = context.pages[0] if context.pages else await context.new_page()
     platforms = ("ig", "threads") if mode == "combined" else (("ig",) if mode == "ig_only" else ("threads",))
     results: dict[str, str | None] = {}
     for platform in platforms:
         results[platform] = await verify_platform(page, platform, debug_dump)
+        if not results[platform] and expected_username:
+            deadline = time.monotonic() + 5
+            while not await identity_matches(page, platform, expected_username):
+                if time.monotonic() >= deadline:
+                    results[platform] = f"{platform} imported checker identity could not be verified"
+                    break
+                await asyncio.sleep(.25)
         if results[platform]:
             break
     return results

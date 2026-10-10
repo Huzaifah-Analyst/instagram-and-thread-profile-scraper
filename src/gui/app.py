@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import queue
 import threading
 from pathlib import Path
 from typing import Callable, Optional
@@ -13,6 +14,8 @@ import customtkinter as ctk
 from src.core.scraper import MODE_COMBINED, MODE_IG_ONLY, MultiWorkerScraper, login_session
 from src.core.session import SESSION_CONNECTED, check_session
 from src.core.checkers import Checker, CheckerStore
+from src.core.credentials import AccountCredential
+from src.core.auto_login import login_accounts
 from src.core.paths import DEFAULT_PROFILE_DIR
 from src.gui import theme
 from src.gui.bridge import ErrorEvent, FinishedEvent, ProgressEvent, RunState, ScraperBridge, ScraperFactory
@@ -55,6 +58,9 @@ class MetaInspectorApp(ctk.CTk):
         self.bridge = ScraperBridge(scraper_factory or self._default_factory)
         self._login_thread: Optional[threading.Thread] = None
         self._login_error: Optional[str] = None
+        self._login_updates: queue.Queue[str] = queue.Queue()
+        self._login_cancel = threading.Event()
+        self._login_summary: Optional[str] = None
         self._total = 0
         self._done = 0
 
@@ -154,7 +160,8 @@ class MetaInspectorApp(ctk.CTk):
             return
         try:
             self._checker_dialog = CheckerDialog(
-                self, self.checker_store, self._start_login, self._refresh_session
+                self, self.checker_store, self._start_login, self._refresh_session,
+                on_import=self._start_import_login,
             )
         except (OSError, ValueError) as exc:
             self.status_bar.message(f"Checker settings: {exc}", "error")
@@ -165,10 +172,34 @@ class MetaInspectorApp(ctk.CTk):
             return
         self._active_login = checker
         self._login_error = None
+        self._login_summary = None
         self._login_thread = threading.Thread(target=self._login_worker, name="checker-login", daemon=True)
         self._login_thread.start()
         self.status_bar.message(f"{checker.checker_id}: log in to BOTH Instagram and Threads tabs, then close the browser.", "warn")
         self._apply_state()
+
+    def _start_import_login(self, accounts: list[AccountCredential], checkers: list[Checker]) -> None:
+        """Keep imported secrets only in the worker's argument lifetime."""
+        if self.bridge.state is not RunState.IDLE or self._login_running:
+            return
+        self._login_error = self._login_summary = None
+        self._login_cancel.clear()
+        self._login_thread = threading.Thread(
+            target=self._import_login_worker, args=(accounts, checkers),
+            name="checker-import-login", daemon=True,
+        )
+        self._login_thread.start()
+        self.status_bar.message("Setting up imported accounts. Follow any manual prompts in the browser.")
+        self._apply_state()
+
+    def _import_login_worker(self, accounts: list[AccountCredential], checkers: list[Checker]) -> None:
+        """Forward only sanitized login progress to the Tk thread."""
+        try:
+            self._login_summary = asyncio.run(login_accounts(
+                accounts, checkers, self._login_cancel, self._login_updates.put,
+            ))
+        except Exception:  # Secret-bearing browser exceptions must not reach logs.
+            self._login_error = "Account login failed. Close the setup browser and retry."
 
     def _login_worker(self) -> None:
         """Background thread: runs the login browser until the user closes it."""
@@ -190,6 +221,11 @@ class MetaInspectorApp(ctk.CTk):
 
     def _poll(self) -> None:
         """Drains bridge events and refreshes timers (runs every 100 ms)."""
+        while True:
+            try:
+                self.status_bar.message(self._login_updates.get_nowait(), "warn")
+            except queue.Empty:
+                break
         for event in self.bridge.poll():
             if isinstance(event, ProgressEvent):
                 self._done = event.done
@@ -211,7 +247,7 @@ class MetaInspectorApp(ctk.CTk):
                 self.status_bar.message(f"Login browser failed: {self._login_error}", "error")
             else:
                 self._session_invalid = False
-                self.status_bar.message("Login window closed. Start will verify both selected platforms live.")
+                self.status_bar.message(self._login_summary or "Login window closed. Start will verify both selected platforms live.")
             self._refresh_session()
             self._apply_state()
 
@@ -254,6 +290,7 @@ class MetaInspectorApp(ctk.CTk):
 
     def _on_close(self) -> None:
         """Stops any run before closing the window."""
+        self._login_cancel.set()
         if self.bridge.state is not RunState.IDLE:
             self.bridge.stop()
             self.bridge.join(timeout=10)

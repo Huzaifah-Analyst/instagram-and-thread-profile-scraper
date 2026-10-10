@@ -1,0 +1,8 @@
+python : warning: unable to access 'C:\Users\huzai/.config/git/ignore': Permission denied
+At line:2 char:1
++ python debug/audit_import_source.py 2>&1 | Tee-Object -FilePath docs/ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: unable...rmission denied:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+{"production_files": 29, "largest_file": [440, "src\\core\\scraper.py"], "new_module_docstring_annotation_violations": [], "credential_match_paths": []}

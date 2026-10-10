@@ -17,8 +17,31 @@ restarted. The existing `dist` executable has not been rebuilt with these change
    entire setup browser. If it is behind the app, select Chromium with Alt+Tab.
 3. Repeat for Checkers 2–5 with a different real account in each slot. The login
    windows are set up one at a time; all saved sessions can run concurrently.
-4. Tick the slots to use and **Save selection**. Passwords/email/2FA stay in the
-   official browser pages; no credential text file is required by the app.
+4. Tick the slots to use and **Save selection**. This manual method does not
+   require a credential file.
+
+## Automatic setup from the supplied account file
+
+1. Restart with `python main.py`, open **Setup Checker Account**, then click
+   **Import accounts & auto-login** and select `docs/accounts.txt`.
+2. The file must contain one `username|password|2FA secret` row per checker, up to
+   five accounts. The current file has no separate email column. Codes are
+   generated locally from the authenticator secrets; keep Windows time correct.
+3. Watch the status bar and visible browser. Each account signs into Instagram
+   then Threads in its own profile. Password/2FA values are not shown in app logs.
+   Browser setup is sequential; target checks can later run across five profiles.
+4. If Meta asks for a checkpoint, CAPTCHA, email/SMS code or an unfamiliar step,
+   finish it manually in that browser, then close the browser and reimport the
+   same file. Setup stops at that account; later accounts are not attempted.
+5. Only the message **All 5 accounts verified on Instagram and Threads** confirms
+   all five completed setup. A partial count or manual-step message is not success.
+6. Open Setup again: check that the expected username appears beside each slot.
+   Select the ready slots, save, set **Checker limit 5**, and run a small Combined
+   batch using the accuracy checks below. Start performs a new live login check.
+
+The app preserves old manual profiles and keeps imported profiles tied to their
+username even if the file order changes. The supplied text file still contains
+credentials on your disk; the app does not delete it or make a second copy.
 
 ## Verify accuracy before a batch
 

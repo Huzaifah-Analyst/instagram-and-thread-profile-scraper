@@ -38,7 +38,9 @@ async def run_pool(scraper: MultiWorkerScraper, users: list[str]) -> list[dict]:
                     viewport={"width": 1280, "height": 800},
                 )
                 contexts.append(context)
-                health = await verify_context(context, scraper.mode, scraper.debug_dump)
+                health = await verify_context(
+                    context, scraper.mode, scraper.debug_dump, expected_username=checker.username,
+                )
                 scraper.checker_health[checker.checker_id] = health
                 failure = next((reason for reason in health.values() if reason), None)
                 if failure:
