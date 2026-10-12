@@ -39,15 +39,16 @@ class BrowserFactory:
         return context
 
 
-@pytest.mark.parametrize("fail_first", [True, False])
-def test_five_setups_stop_on_first_failure_or_finish_all(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fail_first: bool,
+@pytest.mark.parametrize("fail_second", [True, False])
+def test_five_setups_continue_after_second_account_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fail_second: bool,
 ) -> None:
-    """A challenged account stops setup; it is not replaced to bypass restriction."""
+    """A setup failure on account two still attempts both platforms for 3, 4, 5."""
     browser = BrowserFactory()
     monkeypatch.setattr("src.core.auto_login.async_playwright", lambda: browser)
     login = AsyncMock(side_effect=lambda page, platform, account, cancel: LoginOutcome(
-        platform, not fail_first, "Manual verification required." if fail_first else "Verified.",
+        platform, not (fail_second and account.username == "user1"),
+        "Manual verification required." if fail_second and account.username == "user1" else "Verified.",
     ))
     monkeypatch.setattr("src.core.auto_login.login_platform", login)
     accounts = [AccountCredential(f"user{i}", "test-password", "JBSWY3DPEHPK3PXP") for i in range(5)]
@@ -55,12 +56,14 @@ def test_five_setups_stop_on_first_failure_or_finish_all(
     updates: list[str] = []
     result = asyncio.run(login_accounts(accounts, checkers, threading.Event(), updates.append,
                                         headless=True, keep_manual_open=False))
-    assert len(browser.profiles) == (1 if fail_first else 5)
-    assert login.await_count == (1 if fail_first else 10)
+    assert len(browser.profiles) == 5
+    assert login.await_count == 10
     assert all(context.close.await_count == 1 for context in browser.contexts)
     assert len(set(browser.profiles)) == len(browser.profiles)
     assert "test-password" not in str(updates) + result
-    assert ("0/5 verified" if fail_first else "All 5 accounts verified") in result
+    assert ("4/5 verified" if fail_second else "All 5 accounts verified") in result
+    if fail_second:
+        assert "checker_2: ig: Manual verification required." in result
 
 
 def test_bad_binding_never_launches_browser(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

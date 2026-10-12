@@ -2,6 +2,10 @@
 
 2026-10-10. Implements P15, P16 and the configuration part of P20.
 
+Historical implementation report. Round 3 replaces the all-or-nothing preflight
+described below with a healthy subset and isolates target/platform exceptions.
+See [current behavior and regression proof](round3-partial-checker-resilience.md).
+
 The latest user request authorizes implementation and accepts explicit manual
 verification where agent-side live checks are unavailable. Earlier audit
 reports describe the old single-session architecture, not this implementation.

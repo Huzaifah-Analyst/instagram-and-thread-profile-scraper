@@ -310,3 +310,21 @@ passed in 35.94s**, including below-fold Code/Continue controls and handoff fixt
 Live validation is pending browser closure; the screenshot provides visible text,
 not DOM attributes. P37 tracks the fix; P36 is not declared live-resolved.
 See [authenticator-code-form.md](implementation/authenticator-code-form.md).
+
+### 2026-10-12 - Round 3 resilience and actual account health
+
+Pulled the prior fix branch and created `fix/resilience-and-root-cause` as
+explicitly directed. Failed startup/setup slots now yield to healthy selected
+checkers; platform and target exceptions retain error records and continue other
+work. Mid-run session challenge still triggers the global fail-safe. Unstarted
+targets are recorded separately. Full suite: **170 passed in 40.00s**, zero skips.
+
+All five imported checkers were genuinely attempted: IG 1/5 (checker_5), Threads
+0/5, dual-platform 0/5. Checker_2's own live suspension notice states October 9,
+2026 and account integrity; no automation causation is inferred. Checker_1/3
+also reach suspension/verification routes. Checker_4/5 reach Threads onboarding
+and subsequently a broken-home page; cookie presence does not prove a usable
+session. Exact continuation-button mismatch and health-route classification were
+fixed with regressions, but a fresh healthy target-menu capture and the 100-target
+benchmark are gated on restored login. The supplied list has 95 unique targets.
+See [Round 3 report](implementation/round3-report.md) and [test log](test_log.md).

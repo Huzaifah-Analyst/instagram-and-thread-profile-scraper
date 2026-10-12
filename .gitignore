@@ -38,6 +38,7 @@ debug/
 **/debug/
 .pytest_cache/
 .pytest-local-temp*/
+.pytest-local-round3*/
 .test-tcl/
 /docs/accounts.txt
 /docs/testinusername.txt

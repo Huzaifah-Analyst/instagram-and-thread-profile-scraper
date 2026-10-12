@@ -1,11 +1,19 @@
 # MetaInspector central problem log
 
-Updated: 2026-10-10. Branch: `fix/data-accuracy-and-nfr1-verification`.
+Updated: 2026-10-12. Branch: `fix/resilience-and-root-cause`.
 This is the single running inventory of problems. Confirmed observations,
 reproduced code defects and unverified hypotheses are distinguished explicitly.
 Test executions remain in [test_log.md](test_log.md).
 
 ## Current implementation status
+
+**Round 3 supersedes the historical status bullets below.** Full suite:
+**170 passed in 40.00s**, zero skips. Partial checker health, independent platform
+exceptions and claimed-target error retention are regression-tested. Live setup
+attempted all five: **IG 1/5, Threads 0/5, both-platform 0/5**. Checker_2 has an
+actual suspension notice; checker_4/5 Threads home returns an error screen after
+onboarding redirects. No healthy Combined session exists, so the 100-target
+benchmark remains unrun. See [Round 3 report](implementation/round3-report.md).
 
 The user authorized categorized implementation and manual verification where
 needed. The historical audit descriptions below are retained as evidence, with
@@ -177,3 +185,25 @@ individual test runs in test_log.md and task-method reports under implementation
 | P35 | Fixed / live IG login verified | First automatic attempt could not find the current IG username field: `name=email`, `autocomplete=username webauthn`. Read-only control inspection pinpointed the mismatch. Added email-name and autocomplete-token selectors; next live attempt verified the first account on IG. See [report](implementation/account-file-auto-login.md). |
 | P36 | Open / live Threads authentication unverified | After IG succeeded, Threads submitted one authenticator code but no matching authenticated session was verified before timeout. Fresh read-only inspection still showed a login form and no Threads session cookie. It did not show an incorrect-code marker, so rejection, extra verification, or UI progression cannot yet be distinguished. Setup halted with 0/5 dual-platform accounts verified. Complete the first account manually in Setup and reimport; do not count the other four as tested. |
 | P37 | Implemented / synthetic regressions pass; live acceptance pending | User screenshot shows an empty Code field on an explicit authentication-app screen. Prior selectors lacked label/ARIA/approvals_code fallbacks, and page-wide submit selection could choose an unrelated login button. Added explicit-app-prompt field recognition and form/dialog-scoped submission. Also return to Threads once after a verified IG handoff; P36 remains open until live confirmation. See [report](implementation/authenticator-code-form.md). |
+
+## Round 3 findings, 12 October 2026
+
+| ID | State | Evidence and action |
+| --- | --- | --- |
+| P38 | Fixed / regression passes | One failed preflight or browser launch stopped all selected checkers. Three healthy plus two unhealthy now process twelve targets through only the three healthy sessions. Worker cap counts healthy workers; later slots can replace failed startup slots. [Task 1](implementation/round3-partial-checker-resilience.md). |
+| P39 | Fixed / regression and live orchestration verified | Failed setup returned early or waited indefinitely for manual closure. All five accounts now attempted, with ten platform outcomes and per-platform counts. A failed account_2 regression verifies accounts 3–5 are attempted. Actual live authentication remains blocked. |
+| P40 | Fixed / regression passes | Unexpected error after queue claim could lose that target and cancel siblings. Twenty targets with one ValueError now return twenty ordered records, including the ERROR row. Unstarted targets tracked separately. [Task 4](implementation/round3-missing-targets.md). |
+| P41 | Fixed / regression passes | A non-session IG exception prevented the requested Threads extraction. Independent platform boundaries retain Threads data while IG is error; genuine session block still stops globally. |
+| P42 | Fixed / regression passes | Journal disk failure could stop processing before UI callback. Explicit storage warning now preserves in-memory/UI results and allows processing to continue. Persistence is not claimed when storage fails. |
+| P43 | Confirmed external blocker; detection fixed | checker_2 displays actual suspension dated October 9, 2026, account-integrity reason. `/accounts/suspended/` previously timed out as unknown form and could escape health classification with a cookie. Now explicit manual-review outcome; no automation-causation claim. [Task 5](implementation/round3-checker-suspension.md). |
+| P44 | Confirmed live blocker; diagnosis/classification implemented | checker_4/5 reached Threads `/onboarding/`, then broken-page home on read-only follow-up. Cookie exists but identity unverified. Report incomplete setup and reject observed broken-home page. Root server cause and successful setup remain unverified. [Task 3](implementation/round3-threads-root-cause.md). |
+| P45 | Observed selector mismatch fixed / synthetic Chromium passes | Current Threads accessible button text `Continue with InstagramLog in` failed old anchored selector. Exact compound variant now accepted. Successful live login after this change is not claimed. |
+| P46 | Fixed by source change; full suite passes | CLI constructed default numbered profile slots rather than loading imported username-bound paths. CLI now uses CheckerStore for selected and manual-login slots; no new live CLI authentication claim. |
+
+P15/P36 follow-up: all five live setup attempts now have evidence. Historical
+checker_1 dual-platform success does not imply current health; latest IG success
+is checker_5 only. P37 follow-up: sibling/late Continue fallback passed its test
+and one older live attempt submitted OTP but did not verify a session. It remains
+distinct from the newly observed suspension/onboarding blockers. P02/P14 remain
+open across the full batch; no repeated-date or hydration hypothesis was promoted
+to a proven explanation.

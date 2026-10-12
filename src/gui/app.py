@@ -247,11 +247,25 @@ class MetaInspectorApp(ctk.CTk):
                 self.status_bar.message(f"Login browser failed: {self._login_error}", "error")
             else:
                 self._session_invalid = False
-                self.status_bar.message(self._login_summary or "Login window closed. Start will verify both selected platforms live.")
+                summary = self._login_summary or "Login window closed. Start will verify both selected platforms live."
+                self.status_bar.message(summary.splitlines()[0])
+                if "\n" in summary:
+                    self._show_setup_summary(summary)
             self._refresh_session()
             self._apply_state()
 
         self.after(POLL_INTERVAL_MS, self._poll)
+
+    def _show_setup_summary(self, summary: str) -> None:
+        """Keep each checker's outcome readable beyond the single-line status bar."""
+        window = ctk.CTkToplevel(self)
+        window.title("Checker setup results")
+        window.geometry("780x400")
+        window.transient(self)
+        details = ctk.CTkTextbox(window, wrap="word")
+        details.pack(fill="both", expand=True, padx=16, pady=16)
+        details.insert("1.0", summary)
+        details.configure(state="disabled")
 
     def _on_finished(self, event: FinishedEvent) -> None:
         """Shows the end-of-run summary."""
@@ -267,6 +281,20 @@ class MetaInspectorApp(ctk.CTk):
         else:
             self.status_bar.message(
                 f"Done: {checked} accounts in {theme.format_duration(event.elapsed)}.", "success")
+        notices = []
+        if event.unstarted:
+            notices.append(f"{len(event.unstarted)} targets not started")
+        for checker_id, health in event.checker_health.items():
+            reasons = [reason for reason in health.values() if reason]
+            if reasons:
+                notices.append(f"{checker_id}: {'; '.join(reasons)}")
+        if event.journal_error:
+            notices.append(event.journal_error)
+        if notices:
+            self.status_bar.message(
+                f"{checked}/{self._total} checked; {len(event.active_checkers)} healthy at start. "
+                + " | ".join(notices), "warn",
+            )
 
     def _apply_state(self) -> None:
         """Syncs button states with the bridge and login status."""

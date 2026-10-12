@@ -37,18 +37,24 @@ async def authenticator_field(page: Page, allow_label: bool) -> Locator | None:
 
 async def authenticator_submit(field: Locator) -> Locator | None:
     """Prefer the code's form/dialog over unrelated login buttons behind it."""
-    container = field.locator('xpath=ancestor::*[self::form or @role="dialog"][1]')
-    if not await container.count():
-        container = field.locator("xpath=ancestor::body")
-    for expression in (r"^(continue|confirm|verify|submit)$", r"^log\s*in$"):
-        controls = container.get_by_role("button", name=re.compile(expression, re.I))
-        visible = []
-        for index in range(await controls.count()):
-            control = controls.nth(index)
-            if await control.is_visible():
-                visible.append(control)
-        if len(visible) == 1:
-            return visible[0]
-        if len(visible) > 1:
-            return None
+    containers = [field.locator('xpath=ancestor::*[self::form or @role="dialog"][1]'),
+                  field.locator('xpath=ancestor::*[@role="dialog"][1]'),
+                  field.locator("xpath=ancestor::body")]
+    for index, container in enumerate(containers):
+        if not await container.count():
+            continue
+        expressions = [r"^(continue|confirm|verify)$"]
+        if index == 0:
+            expressions.append(r"^(submit|log\s*in)$")
+        for expression in expressions:
+            controls = container.get_by_role("button", name=re.compile(expression, re.I))
+            visible = []
+            for candidate in range(await controls.count()):
+                control = controls.nth(candidate)
+                if await control.is_visible():
+                    visible.append(control)
+            if len(visible) == 1:
+                return visible[0]
+            if len(visible) > 1:
+                return None
     return None

@@ -24,7 +24,6 @@ from pathlib import Path
 from typing import Callable, Optional, Union
 
 from playwright.async_api import BrowserContext, Page
-from playwright.async_api import Error as PlaywrightError
 
 from src.core.ban_engine import (
     COMPOSITE_BLOCKED,
@@ -41,7 +40,7 @@ from src.core.extractors import (
     extract_threads,
 )
 from src.core.resource_blocker import BlockerStats, attach_resource_blocker
-from src.core.checkers import Checker
+from src.core.checkers import Checker, CheckerStore
 from src.core.checker_health import login_session
 from src.core.diagnostics import RunJournal
 from src.core.paths import DEFAULT_PROFILE_DIR
@@ -201,7 +200,10 @@ class MultiWorkerScraper:
         if len(paths) != len(self.checkers):
             raise ValueError("Each checker must have a separate browser profile.")
         self.checker_health: dict[str, dict] = {}
+        self.active_checker_ids: list[str] = []
+        self.unstarted_usernames: list[str] = []
         self.journal = RunJournal() if persist_results else None
+        self.journal_error: str | None = None
         self.profile_dir = Path(profile_dir)
         self.workers = workers
         self.mode = mode
@@ -266,6 +268,7 @@ class MultiWorkerScraper:
             Accounts skipped because of a stop are not included; see ``stop_reason``.
         """
         users = clean_usernames(usernames)
+        self.unstarted_usernames = list(users)
         chunks = chunk_usernames(users, self.workers)
         self._done, self._total = 0, len(users)
         if not chunks:
@@ -276,16 +279,20 @@ class MultiWorkerScraper:
         if self.is_stopped:
             return []
         if self.journal is not None:
-            self.journal.append({
+            self._save_event({
                 "event": "started", "mode": self.mode, "target_count": len(users),
-                "checkers": [c.checker_id for c in self.checkers[:self.workers]],
+                "checkers": [c.checker_id for c in self.checkers],
                 "dialog_timeout_s": self.dialog_timeout_s,
                 "menu_timeout_s": self.menu_click_timeout_s,
             })
         records = await run_pool(self, users)
+        processed = {record["username"] for record in records}
+        self.unstarted_usernames = [user for user in users if user not in processed]
         if self.journal is not None:
-            self.journal.append({"event": "finished", "count": len(records),
+            self._save_event({"event": "finished", "count": len(records),
                                  "stop_reason": self.stop_reason,
+                                 "active_checkers": self.active_checker_ids,
+                                 "unstarted_usernames": self.unstarted_usernames,
                                  "checker_health": self.checker_health})
         return records
 
@@ -329,32 +336,46 @@ class MultiWorkerScraper:
             "menu_click_timeout_s": self.menu_click_timeout_s,
             "debug_dump": self.debug_dump,
         }
-        try:
-            if self.mode in (MODE_IG_ONLY, MODE_COMBINED):
-                ig = await extract_instagram(page, username, **timeout_kwargs)
-            # Check platforms independently; a global stop prevents the next stage.
-            skip_threads = self.is_stopped or ig["status"] == STATUS_SESSION_BLOCKED
-            if self.mode in (MODE_THREADS_ONLY, MODE_COMBINED) and not skip_threads:
-                threads = await extract_threads(page, username, **timeout_kwargs)
-        except PlaywrightError as exc:
-            logger.error("Unexpected browser error for @%s: %s", username, exc)
-            failed = {**empty_platform_result(), "status": STATUS_ERROR, "error": f"Browser error: {exc}"}
-            if ig["status"] is None and self.mode != MODE_THREADS_ONLY:
-                ig = failed
+        for platform, extract in (("ig", extract_instagram), ("threads", extract_threads)):
+            if (platform == "ig" and self.mode == MODE_THREADS_ONLY or
+                    platform == "threads" and self.mode == MODE_IG_ONLY):
+                continue
+            if self.is_stopped or ig["status"] == STATUS_SESSION_BLOCKED:
+                break
+            try:
+                result = await extract(page, username, **timeout_kwargs)
+            except Exception as exc:
+                reason = f"{platform} extraction failed ({type(exc).__name__})"
+                logger.error("%s for @%s", reason, username)
+                result = {**empty_platform_result(), "status": STATUS_ERROR,
+                          "stage": "extractor_error", "error": reason}
+            if platform == "ig":
+                ig = result
             else:
-                threads = failed
+                threads = result
+            if result["status"] == STATUS_SESSION_BLOCKED:
+                self.stop(f"Checker session blocked while checking @{username}: {result.get('error')}")
         return build_record(username, ig, threads, time.monotonic() - t0, mode=self.mode)
 
     def _emit(self, record: dict) -> None:
         """Sends a record to the progress callback without letting it crash a worker."""
-        if self.journal is not None:
-            self.journal.append(record)
+        self._save_event(record)
         if self.progress_callback is None:
             return
         try:
             self.progress_callback(self._done, self._total, record)
         except Exception:  # noqa: BLE001 - a broken UI callback must not kill the run
             logger.exception("Progress callback raised")
+
+    def _save_event(self, record: dict) -> None:
+        """Keep in-memory/UI results available when journal storage fails."""
+        if self.journal is None:
+            return
+        try:
+            self.journal.append(record)
+        except (OSError, TypeError, ValueError) as exc:
+            self.journal_error = f"Result journal unavailable ({type(exc).__name__})"
+            logger.error(self.journal_error)
 
     async def _wait_while_paused(self) -> None:
         """Blocks this worker while paused; ``stop()`` also releases it."""
@@ -399,9 +420,7 @@ def main() -> None:
         sys.stdout.reconfigure(encoding="utf-8")
 
     if args.login or args.login_checker:
-        from src.core.checkers import checker_slots
-
-        slot = checker_slots(args.profile)[(args.login_checker or 1) - 1]
+        slot = CheckerStore(args.profile).load()[(args.login_checker or 1) - 1]
         asyncio.run(login_session(slot.profile_dir))
         return
 
@@ -411,14 +430,12 @@ def main() -> None:
     if not names:
         parser.error("give usernames or --file")
 
-    selected = None
+    slots = CheckerStore(args.profile).load()
+    selected = [slot for slot in slots if slot.enabled]
     if args.checkers:
-        from src.core.checkers import checker_slots
-
         numbers = args.checkers.split(",")
         if not numbers or any(n not in {"1", "2", "3", "4", "5"} for n in numbers) or len(set(numbers)) != len(numbers):
             parser.error("--checkers must list distinct slots from 1 to 5")
-        slots = checker_slots(args.profile)
         selected = [slots[int(n) - 1] for n in numbers]
     scraper = MultiWorkerScraper(profile_dir=args.profile, workers=args.workers, mode=args.mode,
                                  checkers=selected, persist_results=True,

@@ -10,7 +10,7 @@ import pytest
 
 from src.core.about_parser import detect_session_challenge, parse_about_dialog
 from src.core.ban_engine import BanLinkEngine
-from src.core.checker_health import verify_platform
+from src.core.checker_health import verify_context, verify_platform
 from src.core.diagnostics import RunJournal
 from src.core.scraper import MultiWorkerScraper, build_record, empty_platform_result
 from src.core.validation import clean_usernames, positive_seconds
@@ -37,6 +37,19 @@ def test_preflight_checks_platform_cookie_and_login_page() -> None:
     page.context.cookies.return_value = []
     assert "no platform session cookie" in asyncio.run(verify_platform(page, "threads"))
     page.context.cookies.assert_awaited_with("https://www.threads.com/")
+    page.context.cookies.return_value = [{"name": "sessionid"}]
+    page.inner_text.return_value = "Not all who wander are lost, but this page is\nThe link's not working or the page is gone."
+    assert "home page unavailable" in asyncio.run(verify_platform(page, "threads"))
+
+
+def test_preflight_exception_preserves_other_platform_health(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Even an unexpected first-platform error leaves an independent Threads result."""
+    check = AsyncMock(side_effect=[ValueError("unrecognized page"), None])
+    monkeypatch.setattr("src.core.checker_health.verify_platform", check)
+    health = asyncio.run(verify_context(SimpleNamespace(pages=[object()]), "combined"))
+    assert "ValueError" in health["ig"]
+    assert health["threads"] is None
+    assert check.await_count == 2
 
 
 def test_adjacent_label_is_not_a_date() -> None:
@@ -119,6 +132,40 @@ def test_global_stop_prevents_next_platform(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(module, "extract_threads", threads)
     asyncio.run(scraper._check_account(object(), "target"))
     threads.assert_not_awaited()
+
+
+def test_platform_exception_still_checks_other_platform(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A parser exception on IG cannot silently suppress the requested Threads check."""
+    monkeypatch.setattr("src.core.scraper.extract_instagram", AsyncMock(side_effect=ValueError("bad shape")))
+    threads = AsyncMock(return_value={**empty_platform_result(), "status": "active", "date_joined": "April 2016"})
+    monkeypatch.setattr("src.core.scraper.extract_threads", threads)
+    scraper = MultiWorkerScraper()
+    record = asyncio.run(scraper._check_account(object(), "target"))
+    threads.assert_awaited_once()
+    assert record["ig_status"] == "error"
+    assert record["threads_date_joined"] == "April 2016"
+    assert not scraper.is_stopped
+
+
+def test_suspended_checker_is_not_target_ban() -> None:
+    """The observed account-health route is blocked even before its body hydrates."""
+    reason = detect_session_challenge("https://www.instagram.com/accounts/suspended/", "")
+    assert reason == "Checker account suspension/review required"
+    assert BanLinkEngine.evaluate("session_blocked", None)["composite_status"] == "BLOCKED"
+    assert detect_session_challenge("https://www.threads.com/onboarding/", "")
+
+
+def test_journal_disk_error_does_not_prevent_ui_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Storage failure is explicit while the result still reaches the callback."""
+    received: list[dict] = []
+    scraper = MultiWorkerScraper(persist_results=True, progress_callback=lambda done, total, row: received.append(row))
+    def disk_full(record: dict) -> None:
+        """Simulate unavailable persistent storage."""
+        raise OSError("disk full")
+    monkeypatch.setattr(scraper.journal, "append", disk_full)
+    scraper._emit({"username": "target"})
+    assert received == [{"username": "target"}]
+    assert "OSError" in scraper.journal_error
 
 
 def test_journal_retains_completed_rows_before_finish(tmp_path: Path) -> None:

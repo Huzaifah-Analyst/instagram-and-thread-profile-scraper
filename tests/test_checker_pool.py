@@ -74,21 +74,70 @@ def test_five_profiles_process_each_target_once(tmp_path: Path, monkeypatch: pyt
     assert all(context.close.await_count == 1 for context in browser.contexts)
 
 
-def test_preflight_failure_assigns_no_targets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A Threads login wall is reported before any target rows are fabricated."""
+def test_three_healthy_checkers_continue_after_two_failures(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unhealthy setup slots never receive work or prevent healthy peers running."""
     import src.core.checker_pool as pool
 
     scraper, browser = configure_pool(tmp_path, monkeypatch)
     monkeypatch.setattr(pool, "verify_context", AsyncMock(side_effect=[
         {"ig": None, "threads": None}, {"ig": None, "threads": "Threads login required"},
+        {"ig": None, "threads": None}, {"ig": "Challenge", "threads": None},
+        {"ig": None, "threads": None},
     ]))
+
+    async def check(page: object, username: str) -> dict:
+        """Yield to all three healthy workers before returning a result."""
+        await asyncio.sleep(.01)
+        return {"username": username, "composite_status": "ACTIVE"}
+
+    monkeypatch.setattr(scraper, "_check_account", check)
+    records = asyncio.run(scraper.run_async([f"target{i}" for i in range(12)]))
+    assert len(records) == 12
+    assert {r["checker_id"] for r in records} == {"checker_1", "checker_3", "checker_5"}
+    assert scraper.checker_health["checker_2"]["threads"] == "Threads login required"
+    assert scraper.stop_reason is None
+    assert scraper.unstarted_usernames == []
+    assert all(context.close.await_count == 1 for context in browser.contexts)
+
+
+def test_no_healthy_checkers_assigns_no_targets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An empty healthy pool is an explicit prerequisite failure, not five fake rows."""
+    scraper, browser = configure_pool(tmp_path, monkeypatch)
+    monkeypatch.setattr("src.core.checker_pool.verify_context", AsyncMock(
+        return_value={"ig": "Login required", "threads": "Login required"},
+    ))
     check = AsyncMock()
     monkeypatch.setattr(scraper, "_check_account", check)
     assert asyncio.run(scraper.run_async(["target"])) == []
     check.assert_not_awaited()
-    assert "checker_2" in scraper.stop_reason
-    assert "Threads login required" in scraper.stop_reason
+    assert "No healthy" in scraper.stop_reason
+    assert scraper.unstarted_usernames == ["target"]
     assert all(context.close.await_count == 1 for context in browser.contexts)
+
+
+def test_launch_failure_uses_next_checker_with_one_worker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The worker cap limits healthy workers, rather than attempts at startup."""
+    scraper, browser = configure_pool(tmp_path, monkeypatch)
+    scraper.workers = 1
+    original = browser.launch_persistent_context
+    attempts: list[str] = []
+
+    async def launch(directory: str, **kwargs: object) -> SimpleNamespace:
+        """Fail the first browser launch, then delegate normal creation."""
+        attempts.append(directory)
+        if len(attempts) == 1:
+            raise RuntimeError("profile locked")
+        return await original(directory, **kwargs)
+
+    monkeypatch.setattr(browser, "launch_persistent_context", launch)
+    monkeypatch.setattr(scraper, "_check_account", AsyncMock(return_value={
+        "username": "target", "composite_status": "ACTIVE",
+    }))
+    records = asyncio.run(scraper.run_async(["target"]))
+    assert len(attempts) == 2
+    assert records[0]["checker_id"] == "checker_2"
+    assert "RuntimeError" in scraper.checker_health["checker_1"]["error"]
+    assert not scraper.is_stopped
 
 
 def test_challenge_stops_queue_without_reassigning_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -108,7 +157,29 @@ def test_challenge_stops_queue_without_reassigning_target(tmp_path: Path, monkey
     assert len(records) == 5
     assert len(seen) == len(set(seen)) == 5
     assert scraper.is_stopped
+    assert scraper.unstarted_usernames == [f"t{i}" for i in range(5, 30)]
     assert all(context.close.await_count == 1 for context in browser.contexts)
+
+
+def test_unexpected_target_error_does_not_drop_rows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An attempted target gets an error row while all remaining work completes."""
+    scraper, _ = configure_pool(tmp_path, monkeypatch)
+
+    async def check(page: object, username: str) -> dict:
+        """Simulate a non-Playwright exception after claiming a queue entry."""
+        await asyncio.sleep(.001)
+        if username == "target2":
+            raise ValueError("Unexpected parser shape")
+        return {"username": username, "composite_status": "ACTIVE"}
+
+    monkeypatch.setattr(scraper, "_check_account", check)
+    names = [f"target{i}" for i in range(20)]
+    records = asyncio.run(scraper.run_async(names))
+    assert [r["username"] for r in records] == names
+    assert records[2]["composite_status"] == "ERROR"
+    assert "ValueError" in records[2]["error_message"]
+    assert scraper._done == 20
+    assert not scraper.is_stopped
 
 
 def test_selection_persists_and_reuses_original_profile(tmp_path: Path) -> None:

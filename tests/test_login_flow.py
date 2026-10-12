@@ -28,6 +28,35 @@ def browser_case(check: Callable[[Page], Awaitable[None]]) -> None:
     asyncio.run(run())
 
 
+@pytest.mark.parametrize("path,reason", [
+    ("accounts/suspended/", "suspension/review"),
+    ("onboarding/", "onboarding incomplete"),
+])
+def test_account_health_routes_stop_before_secret_entry(path: str, reason: str) -> None:
+    """Real observed health destinations must not time out as an unknown form."""
+    async def check(page: Page) -> None:
+        """Serve a redirected health page with deliberately empty visible text."""
+        html = ('<input name="username"><input type="password">'
+                + '<script>history.replaceState({}, "", "/' + path + '")</script>')
+        await page.route("**/*", lambda route: route.fulfill(body=html, content_type="text/html"))
+        result = await login_platform(page, "ig", ACCOUNT, threading.Event(), 2)
+        assert not result.ready and reason in result.message
+        assert await page.locator('input[type="password"]').input_value() == ""
+    browser_case(check)
+
+
+def test_observed_threads_compound_continue_button() -> None:
+    """The live button includes adjacent Log in text in its accessible name."""
+    async def check(page: Page) -> None:
+        """A successful click reveals a verified synthetic Threads identity."""
+        html = '''<button onclick="document.cookie='sessionid=fake; path=/';
+        document.body.innerHTML='<a href=/@alice>Profile</a>'">Continue with Instagram<span>Log in</span></button>'''
+        await page.route("**/*", lambda route: route.fulfill(body=html, content_type="text/html"))
+        result = await login_platform(page, "threads", ACCOUNT, threading.Event(), 3)
+        assert result.ready
+    browser_case(check)
+
+
 @pytest.mark.parametrize("url,allowed", [
     ("https://www.instagram.com/accounts/login/", True), ("https://www.threads.com/login", True),
     ("http://www.instagram.com/login", False), ("https://instagram.com.evil.test/", False),
@@ -217,4 +246,22 @@ def test_threads_resumes_after_instagram_authenticator_handoff(monkeypatch: pyte
         outcome = await login_platform(page, "threads", ACCOUNT, threading.Event(), 5)
         assert outcome.ready and visits == 2
         assert "threads.com" in page.url
+    browser_case(check)
+
+
+def test_authenticator_continue_outside_input_form_and_hydrated_later(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Meta can render its visible Continue control outside the Code input's form."""
+    monkeypatch.setattr("src.core.login_flow.time.time", lambda: 1234567890)
+    async def check(page: Page) -> None:
+        """Keep an unrelated Log in button while delaying the sibling Continue."""
+        html = '''<h1>Go to your authentication app</h1><button onclick="window.wrong=true">Log in</button>
+          <form><label for="otp">Code</label><input id="otp" autocomplete="off"></form><div id="submit"></div>
+          <script>setTimeout(()=>document.querySelector('#submit').innerHTML='<button onclick="finish()">Continue</button>',250);
+          function finish(){window.otp=document.querySelector('#otp').value; document.cookie='sessionid=fake; path=/';
+          document.body.innerHTML='<a href="/alice/">Profile</a>';}</script>'''
+        await page.route("**/*", lambda route: route.fulfill(body=html, content_type="text/html"))
+        outcome = await login_platform(page, "ig", ACCOUNT, threading.Event(), 4)
+        assert outcome.ready
+        assert await page.evaluate("window.otp") == "005924"
+        assert await page.evaluate("window.wrong === undefined")
     browser_case(check)

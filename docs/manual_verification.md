@@ -34,10 +34,12 @@ restarted. The existing `dist` executable has not been rebuilt with these change
    are handled automatically by the import flow. The separate **Login IG +
    Threads** button opens the manual-login flow and does not load file credentials.
 4. If Meta asks for a checkpoint, CAPTCHA, email/SMS code or an unfamiliar step,
-   finish it manually in that browser, then close the browser and reimport the
-   same file. Setup stops at that account; later accounts are not attempted.
+   automatic setup records the failure, closes that browser and tries later
+   accounts. After the summary appears, reopen the affected slot with **Login IG
+   + Threads**, complete the official manual steps and close its browser.
 5. Only the message **All 5 accounts verified on Instagram and Threads** confirms
-   all five completed setup. A partial count or manual-step message is not success.
+   all five completed setup. The summary also shows separate IG/Threads counts
+   and each account's outcome. Healthy subsets can be used without waiting for five.
 6. Open Setup again: check that the expected username appears beside each slot.
    Select the ready slots, save, set **Checker limit 5**, and run a small Combined
    batch using the accuracy checks below. Start performs a new live login check.
@@ -48,7 +50,7 @@ credentials on your disk; the app does not delete it or make a second copy.
 
 ## Verify accuracy before a batch
 
-1. First enable only Checker 1, choose **Instagram Only**, **Checker limit 1**,
+1. First enable one verified healthy checker, choose **Instagram Only**, **Checker limit 1**,
    and turn **Save debug captures** on. Check `brenda_1074`.
 2. Compare the exact same username in Instagram's About dialog. The user-supplied
    reference showed **October 2025 / China**. `brenna1074` is a different account.
@@ -58,9 +60,15 @@ credentials on your disk; the app does not delete it or make a second copy.
 4. Then use Combined on a small set. Double-click each row: inspect stages,
    errors, source URLs and evidence. ACTIVE with Failed/Partial is not a complete
    extraction. If login is required, return to the named checker slot's Setup.
-5. Enable five logged-in slots, set **Checker limit 5**, and use at least five
+5. Enable the healthy logged-in slots, set **Checker limit 5**, and use at least five
    targets. The **Checker** column identifies assignment. Each target should
    appear once; a challenge stops new work rather than reassigning it invisibly.
+
+Latest live findings (12 October): checker_5 alone passed IG; none passed Threads.
+Start recovery with checker_5's Threads setup. Checker_2 has an actual suspension
+notice; checker_1/3 need their own verification. See the
+[per-checker findings](implementation/round3-live-checker-logins.md). Do not begin
+the Combined benchmark until a real Threads feed/profile login is working.
 
 Results are retained in `results/run_*.jsonl`; screenshots/text/metadata are in
 `debug/`. In the frozen build their planned location is

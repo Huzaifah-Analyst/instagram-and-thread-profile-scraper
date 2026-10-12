@@ -1,5 +1,37 @@
 # TSK-401: NFR-1 benchmark not run
 
+## Round 3 decision, 12 October 2026
+
+Branch: `fix/resilience-and-root-cause`. **100-account Combined benchmark not
+attempted; elapsed time and row breakdown do not exist. NFR-1 is unverified and
+has not met acceptance.** No rounded sample, estimate, extrapolation or simulated
+run is presented as a measured 100-account result.
+
+Task 1 now permits any healthy subset. Task 2 actually attempted all five imported
+checkers: **IG 1/5, Threads 0/5, both platforms 0/5**. Task 3's captures show
+authentication/onboarding/broken-page failures before any usable Threads target
+session. Task 5 confirms a real checker suspension. The directive explicitly
+requires stopping live work without a working checker; there is no healthy subset
+with which to run Combined. This is the blocker, not waiting for all five logins.
+
+[Task 2 counts](round3-live-checker-logins.md),
+[Threads raw evidence](round3-threads-root-cause.md),
+[suspension notice](round3-checker-suspension.md).
+
+The supplied target list also contains **95 unique targets**, not 100. An earlier
+request for the remaining five or a 100-target file is unanswered. Duplicating
+targets or silently inventing five client targets was rejected. After at least
+one real Combined checker works, use an agreed list of 100 unique targets,
+measure the entire `run_async` call including startup/preflight with
+`time.monotonic`, retain its unrounded numeric duration and every row, and report
+the actual participating checker IDs, field completeness, disclosure-only
+partials, extraction errors, BLOCKED rows and never-started count separately.
+Pass requires the requested usable results under 300 seconds, not merely fast
+empty/error rows. No timing/pacing or resource-blocker change was justified by
+the failed authentication prerequisite in this round.
+
+## Earlier attempts (historical)
+
 Date: 2026-10-10. Branch: `fix/data-accuracy-and-nfr1-verification`.
 
 The required 100-account Combined-mode, 5-worker benchmark was **not run**.
@@ -39,4 +71,5 @@ was read in 17.1s total (8.36s row) after re-login; a later target attempt took
 
 **NFR-1 remains unverified, not met by evidence.** No throughput estimate or success
 rate is extrapolated from the one successful target. Fresh baseline stability and
-five working logins are required before the 100-account benchmark.
+working Combined logins are required before the 100-account benchmark. Round 3
+supersedes the earlier requirement to wait for five: any healthy subset suffices.

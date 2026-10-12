@@ -101,8 +101,15 @@ async def login_platform(
     """
     try:
         return await _login_platform(page, platform, credential, cancel, timeout_s)
-    except Exception:  # Browser errors must never expose fill arguments.
-        return LoginOutcome(platform, False, "Browser login failed or was closed; retry from Setup.")
+    except Exception as exc:  # Never expose fill arguments from exception text.
+        path = urlsplit(getattr(page, "url", "")).path.lower().rstrip("/")
+        if path == "/onboarding":
+            message = "Threads onboarding incomplete; finish account setup manually."
+        elif path == "/accounts/suspended":
+            message = "Instagram suspension/review required; open this checker in Setup."
+        else:
+            message = f"Browser login failed ({type(exc).__name__}); retry from Setup."
+        return LoginOutcome(platform, False, message)
 
 
 async def _login_platform(
@@ -118,8 +125,12 @@ async def _login_platform(
     while time.monotonic() < deadline and not cancel.is_set():
         if not official_url(page.url):
             return LoginOutcome(platform, False, "Unexpected login destination; manual review needed.")
-        body = (await page.locator("body").inner_text(timeout=3000)).lower()
         path = urlsplit(page.url).path.lower()
+        if path.rstrip("/") == "/accounts/suspended":
+            return LoginOutcome(platform, False, "Instagram suspension/review required; open this checker in Setup.")
+        if path.rstrip("/") == "/onboarding":
+            return LoginOutcome(platform, False, "Threads onboarding incomplete; finish account setup manually.")
+        body = (await page.locator("body").inner_text(timeout=3000)).lower()
         app_prompt = any(word in body for word in (
             "authentication app", "authenticator app", "authentication code", "authenticator code",
         )) and not any(word in body for word in ("sent a code", "text message", "sent to your email"))
@@ -155,8 +166,14 @@ async def _login_platform(
             if not official_url(page.url):
                 continue
             submit = await authenticator_submit(otp_input)
+            submit_deadline = min(deadline, time.monotonic() + 3)
+            while submit is None and time.monotonic() < submit_deadline and not cancel.is_set():
+                await asyncio.sleep(.15)
+                submit = await authenticator_submit(otp_input)
             if submit is None:
                 return LoginOutcome(platform, False, "2FA submit control not recognized; finish in browser.")
+            if cancel.is_set() or not official_url(page.url):
+                continue
             await otp_input.fill(totp_code(credential.totp_secret), timeout=3000)
             if not official_url(page.url) or cancel.is_set():
                 continue
@@ -182,7 +199,7 @@ async def _login_platform(
                     return LoginOutcome(platform, False, "Login submit control not recognized; finish in browser.")
             elif platform == "threads" and not continue_sent:
                 continue_sent = await click_named(page, (
-                    r"^(continue with instagram|log in with instagram|continue as @?"
+                    r"^(continue with instagram(?:\s*log in)?|log in with instagram|continue as @?"
                     + re.escape(credential.username) + r")$"
                 ))
         for label in ("Not now", "Decline optional cookies", "Only allow essential cookies"):

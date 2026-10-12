@@ -2,6 +2,12 @@
 
 Date: 2026-10-10. Branch: `fix/data-accuracy-and-nfr1-verification`.
 
+Historical implementation report. Round 3 replaces first-failure stop/manual
+waiting with per-account continuation and a full outcome summary; use the
+[current resilience report](round3-partial-checker-resilience.md) and
+[current manual steps](../manual_verification.md). Earlier test/live outcomes
+below remain historical evidence.
+
 ## Problem and scope
 
 The operator owns five checker accounts and requested automatic setup from the

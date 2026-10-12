@@ -43,6 +43,10 @@ class FinishedEvent:
     records: list[dict]
     stop_reason: Optional[str]
     elapsed: float
+    checker_health: dict = field(default_factory=dict)
+    active_checkers: list[str] = field(default_factory=list)
+    unstarted: list[str] = field(default_factory=list)
+    journal_error: Optional[str] = None
 
 
 @dataclass
@@ -177,7 +181,13 @@ class ScraperBridge:
             logger.exception("Scraper run failed")
             self._events.put(ErrorEvent(_friendly_error(exc)))
             return
-        self._events.put(FinishedEvent(records, scraper.stop_reason, time.monotonic() - started))
+        self._events.put(FinishedEvent(
+            records, scraper.stop_reason, time.monotonic() - started,
+            getattr(scraper, "checker_health", {}),
+            getattr(scraper, "active_checker_ids", []),
+            getattr(scraper, "unstarted_usernames", []),
+            getattr(scraper, "journal_error", None),
+        ))
 
 
 def _friendly_error(exc: Exception) -> str:

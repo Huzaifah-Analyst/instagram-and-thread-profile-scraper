@@ -31,8 +31,12 @@ async def verify_platform(page: Page, platform: str, debug_dump: bool = False) -
                 break
             await asyncio.sleep(.25)
         if len(body.strip()) <= 40 and not detect_session_challenge(page.url, body):
+            if debug_dump:
+                await capture_page(page, platform, "checker", "preflight_loading")
             return f"{platform} session could not be verified: page did not load"
         reason = detect_session_challenge(page.url, body)
+        if not reason and "Not all who wander are lost, but this page is" in body:
+            reason = f"{platform} home page unavailable; platform returned its broken-link page"
         if not reason:
             cookies = await page.context.cookies(url)
             if not any(cookie["name"] == "sessionid" for cookie in cookies):
@@ -56,16 +60,18 @@ async def verify_context(
     platforms = ("ig", "threads") if mode == "combined" else (("ig",) if mode == "ig_only" else ("threads",))
     results: dict[str, str | None] = {}
     for platform in platforms:
-        results[platform] = await verify_platform(page, platform, debug_dump)
-        if not results[platform] and expected_username:
-            deadline = time.monotonic() + 5
-            while not await identity_matches(page, platform, expected_username):
-                if time.monotonic() >= deadline:
-                    results[platform] = f"{platform} imported checker identity could not be verified"
-                    break
-                await asyncio.sleep(.25)
-        if results[platform]:
-            break
+        try:
+            results[platform] = await verify_platform(page, platform, debug_dump)
+            if not results[platform] and expected_username:
+                deadline = time.monotonic() + 5
+                while not await identity_matches(page, platform, expected_username):
+                    if time.monotonic() >= deadline:
+                        results[platform] = f"{platform} imported checker identity could not be verified"
+                        break
+                    await asyncio.sleep(.25)
+        except Exception as exc:
+            results[platform] = f"{platform} preflight failed ({type(exc).__name__})"
+            logger.warning(results[platform])
     return results
 
 

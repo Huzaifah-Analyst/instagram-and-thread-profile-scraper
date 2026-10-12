@@ -33,7 +33,10 @@ select the slots and save. The **Checker limit** caps concurrent slots.
 For the supplied account file, choose **Import accounts & auto-login** in Setup
 and select `docs/accounts.txt` (`username|password|2FA secret`, up to five rows).
 Setup runs one account at a time, then the saved accounts can check in parallel.
-Complete any security prompt manually; close the browser and reimport to resume.
+Setup records failed accounts, closes their windows and continues with the rest.
+Read the final per-account summary. For a manual security/setup step, reopen that
+slot with **Login IG + Threads**, complete it and close the browser. Checking uses
+healthy selected slots; a mid-run session challenge still stops the batch.
 See [step-by-step verification](docs/manual_verification.md) and the
 [actual test outcomes](docs/test_log.md). The old packaged executable has not
 been rebuilt with these changes.

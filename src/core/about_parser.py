@@ -56,6 +56,10 @@ def detect_session_challenge(url: str, body_text: str) -> Optional[str]:
         A reason string if a challenge was detected, otherwise ``None``.
     """
     path = urlparse(url).path.lower().rstrip("/")
+    if path == "/accounts/suspended" or path.startswith("/accounts/suspended/"):
+        return "Checker account suspension/review required"
+    if path == "/onboarding" or path.startswith("/onboarding/"):
+        return "Threads account setup incomplete"
     # Match whole path segments so a username like "loginking" is not a login page.
     if any(path == p or path.startswith(p + "/") for p in CHALLENGE_PATH_PREFIXES):
         return f"Redirected to {url}"
