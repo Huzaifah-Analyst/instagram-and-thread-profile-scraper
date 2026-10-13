@@ -274,3 +274,51 @@ def test_extra_page_failure_keeps_existing_worker(
     assert len(asyncio.run(scraper.run_async(["a", "b", "c"]))) == 3
     assert "worker_warning" in scraper.checker_health["checker_1"]
     assert not scraper.is_stopped
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_resource_blocker_toggle_applies_to_every_worker_page(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, enabled: bool,
+) -> None:
+    """A single context's initial and four spare pages share the diagnostic switch."""
+    import src.core.checker_pool as pool
+
+    scraper, browser = configure_pool(tmp_path, monkeypatch)
+    scraper.checkers = scraper.checkers[:1]
+    assert scraper.resource_blocker_enabled is True
+    scraper.resource_blocker_enabled = enabled
+
+    async def check(page: object, username: str) -> dict:
+        """Allow all workers to claim targets and retain complete result identity."""
+        await asyncio.sleep(.001)
+        return {"username": username, "composite_status": "ACTIVE"}
+
+    monkeypatch.setattr(scraper, "_check_account", check)
+    assert len(asyncio.run(scraper.run_async([f"target{i}" for i in range(8)]))) == 8
+    assert len(browser.contexts) == 1 and len(browser.contexts[0].pages) == 5
+    assert pool.attach_resource_blocker.await_count == (5 if enabled else 0)
+    assert len(scraper.blocker_stats) == (5 if enabled else 0)
+
+
+@pytest.mark.parametrize("disabled", [False, True])
+def test_cli_resource_blocker_switch_reaches_engine(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, disabled: bool,
+) -> None:
+    """The CLI toggle reaches the constructor without changing the default."""
+    import src.core.scraper as engine
+
+    observed: list[bool] = []
+
+    def run(scraper: MultiWorkerScraper, names: list[str]) -> list[dict]:
+        """Inspect configuration without opening any checker profile."""
+        assert names == ["target"]
+        observed.append(scraper.resource_blocker_enabled)
+        return []
+
+    argv = ["scraper", "target", "--profile", str(tmp_path), "--checkers", "5"]
+    if disabled:
+        argv.append("--no-resource-blocker")
+    monkeypatch.setattr(engine.sys, "argv", argv)
+    monkeypatch.setattr(MultiWorkerScraper, "run", run)
+    engine.main()
+    assert observed == [not disabled]

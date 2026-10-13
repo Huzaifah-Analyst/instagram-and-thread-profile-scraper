@@ -100,6 +100,19 @@ def test_not_found_and_private_markers() -> None:
     assert not is_not_found_page("someuser 10 posts")
 
 
+def test_threads_not_found_wording_is_recognized() -> None:
+    """Round 5, 2026-10-13: real captured Threads 404 text, previously unmatched --
+    it was misclassified as an identity-verification failure instead of NOT_FOUND
+    for ~24/50 targets in a live Combined batch. Exact text from
+    debug/threads_lukehodges43_identity_20261013_131222_261285.txt."""
+    body = (
+        "Not all who wander are lost, but this page is\n"
+        "The link's not working or the page is gone. Go back to keep exploring.\n"
+        "Back\n© 2026\nThreads Terms\nPrivacy Policy\nCookies Policy"
+    )
+    assert is_not_found_page(body)
+
+
 # ---- dispatcher helpers (TSK-105) ----------------------------------------- #
 
 def test_chunks_100_accounts_into_5_by_20() -> None:

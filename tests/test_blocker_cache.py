@@ -1,0 +1,74 @@
+"""Real Chromium cache/hydration regression against an isolated HTTP server."""
+
+import asyncio
+import threading
+from collections import Counter
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+from playwright.async_api import async_playwright
+
+from src.core.resource_blocker import attach_resource_blocker
+
+
+def test_blocking_keeps_script_cache_and_api_hydration() -> None:
+    """Block images/fonts while cached scripts and fetches still hydrate twice."""
+    counts: Counter[str] = Counter()
+
+    class Handler(BaseHTTPRequestHandler):
+        """Serve all fixture assets locally; count actual HTTP requests."""
+
+        def do_GET(self) -> None:
+            """Give the app script long-lived cache headers and a hydration API."""
+            counts[self.path] += 1
+            if self.path == "/app.js":
+                content_type = "application/javascript"
+                body = b"fetch('/api.json').then(r=>r.json()).then(x=>document.querySelector('p').textContent=x.value)"
+            elif self.path == "/api.json":
+                content_type, body = "application/json", b'{"value":"hydrated"}'
+            else:
+                content_type = "text/html"
+                body = b"""<html><head><link rel='icon' href='data:,'>
+                <style>@font-face{font-family:blocked;src:url('/font.woff2')}
+                p{font-family:blocked}</style></head><body><p>loading</p>
+                <img src='/heavy.png'><script src='/app.js'></script></body></html>"""
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "max-age=3600" if self.path == "/app.js" else "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *args: object) -> None:
+            """Keep fixture HTTP access logs out of pytest output."""
+            return None
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    async def scenario() -> None:
+        """Perform two real navigations; do not mock browser routing or caching."""
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch()
+            try:
+                page = await browser.new_page()
+                stats = await attach_resource_blocker(page)
+                base = f"http://127.0.0.1:{server.server_port}"
+                for suffix in ("/first", "/second"):
+                    await page.goto(base + suffix)
+                    await page.get_by_text("hydrated", exact=True).wait_for()
+                    assert await page.locator("img").evaluate("e => e.naturalWidth") == 0
+                assert stats.blocked >= 4
+                assert stats.allowed >= 4
+            finally:
+                await browser.close()
+
+    try:
+        asyncio.run(scenario())
+        assert counts["/api.json"] == 2
+        assert counts["/app.js"] == 1
+        assert counts["/heavy.png"] == counts["/font.woff2"] == 0
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)

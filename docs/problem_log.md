@@ -233,3 +233,35 @@ login failure is justified.
 | P53 | Fixed / user completion and live identity verified | User clarified that Threads remained on onboarding: Continue could not be reached and scrolling did not work. Manual setup used a fixed 1280x800 viewport. It now uses no fixed viewport and starts maximized, permitting native window resizing. Tests assert these settings; user completed onboarding in the reopened checker_5 setup and live preflight verified both platforms. This changes login windows, not extraction viewport. |
 
 | P54 | Open / measured live extraction and speed failure | 95-target Combined run returned all 95 rows in 1047.6569999999992 seconds using one verified checker context and five pages. Complete 0, Partial 14, Failed 81; all rows carry errors. Identity failures IG49/Threads60, Threads About-menu33, IG About-dialog18. Inspected captures include loading splash and menu spinner. Underlying readiness/network/server cause unproven; no five-minute acceptance. [Benchmark](implementation/TSK-401-nfr1-benchmark.md). |
+
+
+### Round 5 - root-cause isolation, 13 October 2026
+
+| ID | State | Evidence and action |
+| --- | --- | --- |
+| P55 | Reproduced mechanism defect / repaired / 8-target live check passed | Wildcard Playwright routing disables HTTP cache and intercepts critical requests. Five-page pass-through control failed 5/8 despite aborting zero assets, while OFF and selective blocker each completed 8/8. New real Chromium fixture proves cached script requested once, old implementation twice. Selective CDP heavy-resource interception retains default blocking without routing critical requests. This does not prove every historical failure had this single cause. [Task 1](implementation/round5-resource-blocker.md). |
+| P56 | Implemented / diagnostic switch covered | Constructor resource_blocker_enabled and CLI --no-resource-blocker affect initial and additional worker pages; default remains ON. No other checker slots were opened. [Task 2](implementation/round5-concurrency.md). |
+
+
+### Round 5 continuation (Claude, not Codex), 13 October 2026
+
+Codex hit its usage limit mid-Task-3, while editing `tests/test_blocker_cache.py`,
+after completing and committing nothing beyond the Task 1/2 work above (left
+uncommitted on `fix/extraction-root-cause-isolation`). Huzaifah asked Claude to
+continue the implementation directly until Codex's limit resets. This
+continuation reviewed the actual repo state (not just the narrated log),
+ran the full suite (187 passed, confirming the uncommitted work was sound),
+then inspected the raw evidence from Codex's own 50-account Combined run
+(`debug/round5-t3-combined50.json` plus the per-target `debug/threads_*`
+captures) to find and fix two concrete causes behind the 24 Threads
+"identity"-stage and 6 Threads "about_dialog"-stage records in that run.
+
+| ID | State | Evidence and action |
+| --- | --- | --- |
+| P57 | Fixed / regression test passes | Threads' real "page not found" wording ("Not all who wander are lost, but this page is... The link's not working or the page is gone") was absent from NOT_FOUND_MARKERS. Sampled all 24 Threads identity-stage failures from the 50-account run (`debug/threads_*_identity_*.txt`, timestamps 13:12-13:16) — every single one showed this exact text, meaning a genuine "no Threads account" case was being misclassified as "profile identity could not be verified" instead of NOT_FOUND. Added the marker; `tests/test_core_helpers.py::test_threads_not_found_wording_is_recognized` uses the exact captured text. [Report](implementation/round5-threads-404.md). |
+| P58 | Fixed / real-Chromium regression test passes | The Threads About panel sometimes renders with no "Based in" row at all (distinct from an explicit "Not shared" value) — confirmed via `debug/threads_charity_3810_*`, where the raw dialog text was captured ~30 times across the full `dialog_timeout_s` poll window with identical content each time (date_joined present, no country line), proving this is the panel's final, stable state, not a late-hydration timing issue. Previously classified as a stuck/failed `about_dialog` stage. Added a `missing == ["country"]` branch in `_extract` (`src/core/extractors.py`) that sets `country_availability="not_disclosed"` and `stage="complete"`, matching the existing "Not shared" handling. Does not change `data_quality` grading (`build_record`'s `country_is_disclosed()` already correctly scored a missing country as Partial, not Complete, before and after this fix) — this only corrects the misleading stage-level diagnostic. [Report](implementation/round5-threads-country-absent.md). |
+| P59 | Open / single occurrence, not root-caused | One record (`de.ja5945`) failed with "Threads About option not found" even though the `profile_menu_open` debug capture's body text shows the menu was open and "About this profile" was visibly present in the text dump at that exact moment. `_click_menu_item` uses `get_by_text(..., exact=True)` plus a visible-candidate count that returns `None` on ambiguity — a transient multi-match or a reflow between the capture and the click is plausible but unconfirmed. One occurrence out of 50 is not enough evidence to fix without risking a wrong guess; needs another sample to investigate. |
+
+Fresh full suite after both fixes: **189 passed**, zero skips. Checkers 1/2/3/4
+were not opened; only checker_5 was used, and no new live run was started in
+this continuation beyond reading already-captured evidence from Codex's run.

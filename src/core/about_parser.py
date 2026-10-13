@@ -25,6 +25,11 @@ NOT_FOUND_MARKERS = (
     "profil kullanılamıyor",
     "sayfa bulunamadı",
     "sayfa kullanılamıyor",
+    # Threads' own 404 wording (round 5, 2026-10-13 live evidence): distinct
+    # from Instagram's, and was previously unmatched -- a real "no Threads
+    # account" case was misclassified as an identity-verification failure
+    # instead of NOT_FOUND. See docs/implementation/round5-threads-404.md.
+    "the link's not working or the page is gone",
 )
 PRIVATE_MARKERS = ("this account is private", "bu hesap gizli")
 CHALLENGE_PATH_PREFIXES = ("/accounts/login", "/login", "/challenge", "/checkpoint", "/auth_platform")

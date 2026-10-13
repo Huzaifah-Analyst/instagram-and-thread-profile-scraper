@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Union
 from urllib.parse import urlparse
 
-from playwright.async_api import BrowserContext, Page, Route
+from playwright.async_api import Page, Request
 from playwright.async_api import Error as PlaywrightError
 
 logger = logging.getLogger(__name__)
@@ -49,30 +48,46 @@ def should_block(resource_type: str, url: str) -> bool:
     return path.endswith(BLOCKED_EXTENSIONS)
 
 
-async def attach_resource_blocker(target: Union[Page, BrowserContext]) -> BlockerStats:
-    """Registers a route handler that aborts images, media and fonts.
+async def attach_resource_blocker(target: Page) -> BlockerStats:
+    """Block heavy Chromium resources without routing critical requests.
 
-    Args:
-        target: A Playwright page or browser context.
-
-    Returns:
-        A live ``BlockerStats`` object updated as requests flow.
+    Playwright's wildcard page routing disables HTTP cache and intercepts every
+    document/script/API request. CDP Fetch patterns instead pause only heavy
+    resource types and Other requests needing the extension fallback. They leave
+    document, stylesheet, script, XHR and Fetch traffic on the native path.
     """
     stats = BlockerStats()
+    session = await target.context.new_cdp_session(target)
+    intercepted = {"Image", "Media", "Font", "Other"}
 
-    async def _handle(route: Route) -> None:
-        request = route.request
+    async def paused(event: dict) -> None:
+        """Abort selected heavy assets and release other paused requests."""
+        resource_type = event.get("resourceType", "Other").lower()
+        blocked = should_block(resource_type, event["request"]["url"])
         try:
-            if should_block(request.resource_type, request.url):
+            if blocked:
+                await session.send("Fetch.failRequest", {
+                    "requestId": event["requestId"], "errorReason": "Aborted",
+                })
                 stats.blocked += 1
-                await route.abort()
             else:
-                stats.allowed += 1
-                await route.continue_()
+                await session.send("Fetch.continueRequest", {
+                    "requestId": event["requestId"],
+                })
         except PlaywrightError as exc:
-            # Happens when the page navigates or closes mid-request.
-            logger.debug("Route already handled for %s: %s", request.url, exc)
+            logger.debug("Resource request ended before handling: %s", exc)
 
-    await target.route("**/*", _handle)
-    logger.debug("Resource blocker attached to %s", type(target).__name__)
+    def observed(request: Request) -> None:
+        """Count allowed requests without intercepting critical traffic."""
+        if (request.resource_type.capitalize() not in intercepted
+                or not should_block(request.resource_type, request.url)):
+            stats.allowed += 1
+
+    session.on("Fetch.requestPaused", paused)
+    await session.send("Fetch.enable", {"patterns": [
+        {"resourceType": resource_type, "requestStage": "Request"}
+        for resource_type in sorted(intercepted)
+    ]})
+    target.on("request", observed)
+    logger.debug("Selective Chromium resource blocker attached to page")
     return stats

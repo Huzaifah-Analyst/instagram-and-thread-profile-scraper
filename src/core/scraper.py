@@ -159,6 +159,7 @@ class MultiWorkerScraper:
         progress_callback: Optional[ProgressCallback] = None,
         checkers: Optional[list[Checker]] = None,
         persist_results: bool = False,
+        resource_blocker_enabled: bool = True,
     ) -> None:
         """Configures the scraper.
 
@@ -181,6 +182,8 @@ class MultiWorkerScraper:
                 written to ``debug/`` (git-ignored) for post-mortem review --
                 e.g. to confirm a parsed join date is genuine, not a stale or
                 decoy value. See `docs/memory.md`'s 2026-10-10 live test entry.
+            resource_blocker_enabled: Disable only for controlled network diagnostics.
+                The default retains media/font blocking on each worker page.
             progress_callback: Called as ``(done, total, record)`` after each account.
                 It runs on the scraper's event-loop thread, so GUI code should
                 hand the record to a queue rather than touch widgets directly.
@@ -214,6 +217,7 @@ class MultiWorkerScraper:
         self.dialog_timeout_s = dialog_timeout_s
         self.menu_click_timeout_s = menu_click_timeout_s
         self.debug_dump = debug_dump
+        self.resource_blocker_enabled = resource_blocker_enabled
         self.progress_callback = progress_callback
         self.blocker_stats: list[BlockerStats] = []
         self.stop_reason: Optional[str] = None
@@ -301,7 +305,8 @@ class MultiWorkerScraper:
         pages = list(context.pages[:count])
         while len(pages) < count:
             pages.append(await context.new_page())
-        self.blocker_stats = [await attach_resource_blocker(page) for page in pages]
+        self.blocker_stats = ([await attach_resource_blocker(page) for page in pages]
+                              if self.resource_blocker_enabled else [])
         return pages
 
     async def _worker(self, worker_id: int, page: Page, items: list[tuple[int, str]], results: dict[int, dict]) -> None:
@@ -399,6 +404,9 @@ def main() -> None:
     parser.add_argument("--profile", type=Path, default=DEFAULT_PROFILE_DIR)
     parser.add_argument("--checkers", help="Comma-separated checker numbers, e.g. 1,2,3,4,5")
     parser.add_argument("--login-checker", type=int, choices=range(1, 6), help="Login a named checker slot")
+    parser.add_argument("--no-resource-blocker", action="store_false",
+                        dest="resource_blocker_enabled",
+                        help="Diagnostic: allow all resources (blocking is on by default)")
     parser.add_argument("--headed", action="store_true", help="Show the browser windows")
     parser.add_argument("--login", action="store_true", help="Open a browser for one-time login")
     parser.add_argument("--page-ready-timeout", type=float, default=PAGE_READY_TIMEOUT_S,
@@ -441,7 +449,8 @@ def main() -> None:
                                  checkers=selected, persist_results=True,
                                  headless=not args.headed, page_ready_timeout_s=args.page_ready_timeout,
                                  dialog_timeout_s=args.dialog_timeout, menu_click_timeout_s=args.menu_click_timeout,
-                                 debug_dump=args.debug_dump)
+                                 debug_dump=args.debug_dump,
+                                 resource_blocker_enabled=args.resource_blocker_enabled)
     t0 = time.monotonic()
     records = scraper.run(names)
     elapsed = time.monotonic() - t0

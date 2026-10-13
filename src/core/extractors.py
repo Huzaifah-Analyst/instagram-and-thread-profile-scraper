@@ -182,6 +182,18 @@ async def _extract(
                 result["stage"] = "complete"
             else:
                 result["error"] += f"; not available/loaded: {', '.join(missing)}"
+        elif missing == ["country"]:
+            # Round 5, 2026-10-13 live evidence (debug/threads_charity_3810_*):
+            # the About panel polled stable for the full dialog_timeout_s budget
+            # with date_joined present and no "Based in" row at all -- distinct
+            # from an explicit "Not shared" value, but the same non-failure
+            # situation: the platform simply did not render a country line for
+            # this account. Counting it as a failure/partial extraction
+            # misrepresents genuinely complete (for what the platform shows)
+            # data. See docs/implementation/round5-threads-country-absent.md.
+            result["country_availability"] = "not_disclosed"
+            result["error"] = f"{label} About: country not shown by platform"
+            result["stage"] = "complete"
         elif missing:
             await _failure(page, result, f"{label} About: not available/loaded: {', '.join(missing)}")
         else:

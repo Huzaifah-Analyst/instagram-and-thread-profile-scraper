@@ -10,7 +10,7 @@ from playwright.async_api import Page, Route, async_playwright
 
 from src.core.browser_helpers import _click_menu_item, _safe_click
 from src.core.dialogs import _poll_dialog
-from src.core.extractors import _find_threads_menu_button, extract_instagram
+from src.core.extractors import _find_threads_menu_button, extract_instagram, extract_threads
 
 
 def run_browser(check: Callable[[Page], Awaitable[None]]) -> None:
@@ -145,6 +145,40 @@ def test_unknown_page_is_error_and_early_failure_has_capture(
         assert result["country"] is None
         assert Path(result["evidence"]).exists()
         assert len(list(tmp_path.glob("*.png"))) == 1
+
+    run_browser(check)
+
+
+def test_threads_about_with_no_country_row_is_complete_not_failed() -> None:
+    """Round 5, 2026-10-13 live evidence (debug/threads_charity_3810_*): the About
+    panel sometimes has no 'Based in' row at all (distinct from an explicit 'Not
+    shared' value), stable for the whole poll budget. That must classify as a
+    resolved, complete stage -- not a stuck/failed about_dialog -- so operators
+    and diagnostics aren't misled into thinking the panel itself is broken."""
+    async def check(page: Page) -> None:
+        """Serve a full Threads flow locally; the About panel has Joined but no country."""
+        async def fulfill(route: Route) -> None:
+            await route.fulfill(content_type="text/html", body='''
+              <div role="main" style="padding-top:120px">
+                <h1>target</h1>
+                <div role="button" onclick="document.getElementById('menu').style.display='block'">
+                  <svg title="More" width="24" height="24"><title>More</title></svg>
+                </div>
+                <div id="menu">
+                  <span onclick="document.getElementById('about').style.display='block'">About this profile</span>
+                </div>
+                <div id="about" role="dialog" style="display:none">
+                  Name<br>target (@target)<br>Joined<br>October 2025 &middot; 100M+
+                </div>
+              </div>''')
+
+        await page.route("**/*", fulfill)
+        result = await extract_threads(page, "target", page_ready_timeout_s=1, dialog_timeout_s=.5)
+        assert result["date_joined"] == "October 2025"
+        assert result["country"] is None
+        assert result["country_availability"] == "not_disclosed"
+        assert result["stage"] == "complete"
+        assert result["error"] == "Threads About: country not shown by platform"
 
     run_browser(check)
 

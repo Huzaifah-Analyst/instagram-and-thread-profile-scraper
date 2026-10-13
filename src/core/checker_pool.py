@@ -53,7 +53,8 @@ async def run_pool(scraper: MultiWorkerScraper, users: list[str]) -> list[dict]:
                         contexts.remove(context)
                         continue
                     page = context.pages[0]
-                    scraper.blocker_stats.append(await attach_resource_blocker(page))
+                    if scraper.resource_blocker_enabled:
+                        scraper.blocker_stats.append(await attach_resource_blocker(page))
                     workers.append((checker, page))
                     healthy.append((checker, context))
                 except Exception as exc:
@@ -100,8 +101,9 @@ async def _fill_worker_pages(
         page = None
         try:
             page = await context.new_page()
-            stats = await attach_resource_blocker(page)
-            scraper.blocker_stats.append(stats)
+            if scraper.resource_blocker_enabled:
+                stats = await attach_resource_blocker(page)
+                scraper.blocker_stats.append(stats)
             workers.append((checker, page))
         except Exception as exc:
             reason = f"Additional worker page failed ({type(exc).__name__})"

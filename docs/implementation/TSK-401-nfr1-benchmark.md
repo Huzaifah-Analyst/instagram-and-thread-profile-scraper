@@ -1,5 +1,64 @@
 # TSK-401: live Combined benchmark - Round 4
 
+## Round 5: 50-account Combined recheck (Claude continuation), 13 October 2026
+
+Branch `fix/extraction-root-cause-isolation`. Codex ran this 50-target
+Combined recheck as Task 3 of its Round 5 directive, after fixing the
+resource-blocker routing/cache defect (P55/P56), then hit a usage limit
+before writing it up. This section reports Codex's own already-captured
+result (`debug/round5-t3-combined50.json`); no new live run was started to
+produce these numbers.
+
+**Elapsed: 281.9220000000023 seconds** (~4m 42s), workers=5, one checker
+(checker_5), blocker ON (selective/corrected), debug_dump on. This is a
+**50-target** recheck, not the 100-target NFR-1 benchmark, and not directly
+comparable to Round 4's 95-target 1047.66s run (different target count,
+and Round 4 predates the resource-blocker fix) -- it is reported to show
+the blocker fix's effect on a larger, more realistic Combined batch than
+the 8-target Task 1/2 samples.
+
+| Metric | Round 4 (95 targets, pre-fix) | Round 5 (50 targets, post-fix) |
+| --- | ---: | ---: |
+| Elapsed | 1047.66s | 281.92s |
+| Elapsed per target | ~11.0s | ~5.6s |
+| Data quality | Complete 0, Partial 14, Failed 81 | Complete 15, Partial 31, Failed 4 |
+| IG both fields | 12/95 dates, 11/95 countries | 45/50 |
+| Threads both fields | 2/95 | 17/50 (pre P57/P58; see below) |
+| Unstarted / dropped | 0 / 0 | 0 / 0 |
+| Stop reason | none | none |
+
+Per-target elapsed time roughly halved and IG's both-fields rate went from
+~12% to 90% -- consistent with the resource-blocker routing/cache fix
+(P55/P56) being a genuine, substantial improvement, not just an 8-target
+artifact. **This is still not a 100-target run and NFR-1 (100 accounts
+under 5 minutes) remains unverified** -- 50 targets in 281.9s does not
+linearly imply 100 targets in under 300s, and no such extrapolation is
+claimed here.
+
+Threads' own result (17/50 both-fields before P57/P58) undersells what was
+actually happening: of the 33 non-complete Threads records, `threads_stage`
+breakdown was `identity` 24, `about_dialog` 6, `navigate` 2 (a transient
+`net::ERR_NETWORK_CHANGED`), `about_menu` 1. Reading the raw evidence behind
+each of these (see `round5-threads-404.md` and
+`round5-threads-country-absent.md`) found that **all 24 `identity` failures
+and 5 of the 6 `about_dialog` failures were not extraction bugs**: the 24
+were genuine "this account has no Threads profile" pages (Threads' 404
+wording was simply unrecognized, so `NOT_FOUND` was misreported as an
+identity-verification failure), and the 5 were panels that Threads rendered
+with no country row at all (not a timing/hydration problem -- confirmed
+stable for the entire poll budget). Both are now fixed (P57, P58) and
+covered by regression tests, but **not yet re-verified by a fresh live
+run against this same 50-target list** -- the next live batch should show
+the Threads `NOT_FOUND` count rise and the `identity`/`about_dialog`
+failure counts drop accordingly, which is the next thing to confirm before
+attempting the actual 100-target NFR-1 benchmark.
+
+[Raw 50-target result](../../debug/round5-t3-combined50.json) (local only,
+contains target usernames).
+
+---
+
+
 13 October 2026. Branch: `fix/single-account-worker-concurrency`.
 User changed the immediate request to **95 unique targets**. This result is for
 that actual list; it is not a completed 100-target NFR-1 benchmark.
