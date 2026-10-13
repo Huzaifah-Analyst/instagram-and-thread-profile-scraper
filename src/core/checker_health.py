@@ -2,10 +2,12 @@
 
 import asyncio
 import logging
+import threading
 import time
 from pathlib import Path
+from typing import Callable
 
-from playwright.async_api import BrowserContext, Page, async_playwright
+from playwright.async_api import BrowserContext, BrowserType, Page, async_playwright
 from playwright.async_api import Error as PlaywrightError
 
 from src.core.about_parser import detect_session_challenge
@@ -75,23 +77,67 @@ async def verify_context(
     return results
 
 
-async def login_session(profile_dir: Path) -> None:
-    """Open both official login pages, bringing the first tab to the foreground."""
-    profile_dir.mkdir(parents=True, exist_ok=True)
-    async with async_playwright() as pw:
-        context = await pw.chromium.launch_persistent_context(
-            str(profile_dir), channel="chromium", headless=False,
-            viewport={"width": 1280, "height": 800}
-        )
-        closed = asyncio.Event()
-        context.on("close", lambda _context: closed.set())
+async def _manual_window(
+    browser: BrowserType, profile_dir: Path, url: str,
+    cancel: threading.Event | None,
+) -> bool:
+    """Open one login tab until the user closes it; return false on cancellation."""
+    context = await browser.launch_persistent_context(
+        str(profile_dir), channel="chromium", headless=False,
+        no_viewport=True, args=["--start-maximized"],
+    )
+    closed = asyncio.Event()
+    context.on("close", lambda *_: closed.set())
+    try:
+        page = context.pages[0] if context.pages else await context.new_page()
+        for extra in context.pages[1:]:
+            await extra.close()
         try:
-            instagram = context.pages[0] if context.pages else await context.new_page()
-            threads = await context.new_page()
-            await instagram.goto("https://www.instagram.com/accounts/login/", wait_until="domcontentloaded")
-            await threads.goto("https://www.threads.com/login", wait_until="domcontentloaded")
-            await instagram.bring_to_front()
-            logger.info("Complete Instagram AND Threads login in the two tabs, then close this browser.")
-            await closed.wait()
+            await page.goto(url, wait_until="domcontentloaded")
+        except PlaywrightError:
+            if not closed.is_set():
+                raise
+            logger.info("User closed the login window during navigation")
+        while not closed.is_set():
+            if cancel is not None and cancel.is_set():
+                return False
+            await asyncio.sleep(.2)
+        return cancel is None or not cancel.is_set()
+    finally:
+        await context.close()
+
+
+async def login_session(
+    profile_dir: Path, expected_username: str | None = None,
+    progress: Callable[[str], None] | None = None,
+    cancel: threading.Event | None = None,
+) -> str:
+    """Run manual IG then Threads windows on one saved profile and verify both."""
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    notify = progress or logger.info
+    async with async_playwright() as pw:
+        for name, url in (
+            ("Instagram", "https://www.instagram.com/accounts/login/"),
+            ("Threads", "https://www.threads.com/login"),
+        ):
+            if cancel is not None and cancel.is_set():
+                return "Setup cancelled; logins were not verified."
+            notify(f"Log in to {name}, then close that browser window to continue.")
+            if not await _manual_window(pw.chromium, profile_dir, url, cancel):
+                return "Setup cancelled; logins were not verified."
+        notify("Checking Instagram and Threads logins live...")
+        context = await pw.chromium.launch_persistent_context(
+            str(profile_dir), channel="chromium", headless=True,
+            viewport={"width": 1280, "height": 800},
+        )
+        try:
+            health = await verify_context(
+                context, "combined", expected_username=expected_username,
+            )
         finally:
             await context.close()
+    lines = ["Both logins verified." if not any(health.values())
+             else "Setup needs attention; see platform results."]
+    for platform, name in (("ig", "Instagram"), ("threads", "Threads")):
+        lines.append(f"{name}: {health[platform] or 'Logged in (live verified)'}")
+    return "\n".join(lines)

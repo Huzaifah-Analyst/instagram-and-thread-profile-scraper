@@ -1,0 +1,205 @@
+........................................................................ [ 39%]
+........................................................................ [ 79%]
+..................................F...                                   [100%]
+================================== FAILURES ===================================
+____________ test_sequential_real_windows_reuse_persisted_profile _____________
+
+fut = <coroutine object login_session at 0x0000027F12F368F0>, timeout = 40
+
+    async def wait_for(fut, timeout):
+        """Wait for the single Future or coroutine to complete, with timeout.
+
+        Coroutine will be wrapped in Task.
+
+        Returns result of the Future or coroutine.  When a timeout occurs,
+        it cancels the task and raises TimeoutError.  To avoid the task
+        cancellation, wrap it in shield().
+
+        If the wait is cancelled, the task is also cancelled.
+
+        If the task suppresses the cancellation and returns a value instead,
+        that value is returned.
+
+        This function is a coroutine.
+        """
+        # The special case for timeout <= 0 is for the following case:
+        #
+        # async def test_waitfor():
+        #     func_started = False
+        #
+        #     async def func():
+        #         nonlocal func_started
+        #         func_started = True
+        #
+        #     try:
+        #         await asyncio.wait_for(func(), 0)
+        #     except asyncio.TimeoutError:
+        #         assert not func_started
+        #     else:
+        #         assert False
+        #
+        # asyncio.run(test_waitfor())
+
+
+        if timeout is not None and timeout <= 0:
+            fut = ensure_future(fut)
+
+            if fut.done():
+                return fut.result()
+
+            await _cancel_and_wait(fut)
+            try:
+                return fut.result()
+            except exceptions.CancelledError as exc:
+                raise TimeoutError from exc
+
+        async with timeouts.timeout(timeout):
+>           return await fut
+                   ^^^^^^^^^
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:520:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\core\checker_health.py:126: in login_session
+    if not await _manual_window(pw.chromium, profile_dir, url, cancel):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\core\checker_health.py:104: in _manual_window
+    await asyncio.sleep(.2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+delay = 0.2, result = None
+
+    async def sleep(delay, result=None):
+        """Coroutine that completes after a given time (in seconds)."""
+        if delay <= 0:
+            await __sleep0()
+            return result
+
+        loop = events.get_running_loop()
+        future = loop.create_future()
+        h = loop.call_later(delay,
+                            futures._set_result_unless_cancelled,
+                            future, result)
+        try:
+>           return await future
+                   ^^^^^^^^^^^^
+E           asyncio.exceptions.CancelledError
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:665: CancelledError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = WindowsPath('C:/Users/huzai/Downloads/alizakhan/.pytest-local-temp-round4-full/test_sequential_real_windows_r0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000027F13AC7680>
+
+    def test_sequential_real_windows_reuse_persisted_profile(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Close real headed windows in order; persistent cookies survive relaunch."""
+        original = BrowserType.launch_persistent_context
+        contexts: list[BrowserContext] = []
+        closed: list[int] = []
+        visits: list[str] = []
+        closers: list[asyncio.Task] = []
+
+        async def launch(
+            browser: BrowserType, directory: str, **kwargs: object,
+        ) -> BrowserContext:
+            """Route fixture login pages without sending any traffic to Meta."""
+            index = len(contexts)
+            assert closed == list(range(index))
+            assert directory == str(tmp_path / "browser_profile")
+            assert kwargs["headless"] is (index == 2)
+            context = await original(browser, directory, **kwargs)
+            contexts.append(context)
+            context.on("close", lambda *_: closed.append(index))
+
+            async def route(request: Route) -> None:
+                """Provide local HTML for every request in these isolated profiles."""
+                await request.fulfill(body="<html><body>Fixture login only</body></html>")
+
+            await context.route("**/*", route)
+            if index == 0:
+                await context.add_cookies([{
+                    "name": "fixture_persistence", "value": "yes",
+                    "url": "https://www.instagram.com/", "expires": 2000000000,
+                }])
+            else:
+                assert any(c["name"] == "fixture_persistence" for c in await context.cookies())
+            if index < 2:
+                async def close_loaded() -> None:
+                    """Simulate user closure only after the one expected tab loads."""
+                    page = context.pages[0]
+                    await page.wait_for_url("**/login*", timeout=10000)
+                    visits.append(page.url)
+                    assert len(context.pages) == 1
+                    await context.close()
+
+                closers.append(asyncio.create_task(close_loaded()))
+            return context
+
+        monkeypatch.setattr(BrowserType, "launch_persistent_context", launch)
+        verify = AsyncMock(return_value={"ig": None, "threads": "Fixture: login missing"})
+        monkeypatch.setattr(checker_health, "verify_context", verify)
+
+        async def scenario() -> str:
+            """Finish both closures and surface any asynchronous assertion failures."""
+            try:
+                summary = await asyncio.wait_for(checker_health.login_session(
+                    tmp_path / "browser_profile", expected_username="fixture",
+                ), 40)
+                await asyncio.gather(*closers)
+                return summary
+            finally:
+                for context in contexts:
+                    await context.close()
+
+>       summary = asyncio.run(scenario())
+                  ^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_round4_browser.py:117:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+..\..\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py:195: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py:691: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+tests\test_round4_browser.py:108: in scenario
+    summary = await asyncio.wait_for(checker_health.login_session(
+..\..\AppData\Local\Programs\Python\Python312\Lib\asyncio\tasks.py:519: in wait_for
+    async with timeouts.timeout(timeout):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <Timeout [expired]>
+exc_type = <class 'asyncio.exceptions.CancelledError'>
+exc_val = CancelledError(), exc_tb = <traceback object at 0x0000027F13921940>
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> Optional[bool]:
+        assert self._state in (_State.ENTERED, _State.EXPIRING)
+
+        if self._timeout_handler is not None:
+            self._timeout_handler.cancel()
+            self._timeout_handler = None
+
+        if self._state is _State.EXPIRING:
+            self._state = _State.EXPIRED
+
+            if self._task.uncancel() <= self._cancelling and exc_type is exceptions.CancelledError:
+                # Since there are no new cancel requests, we're
+                # handling this.
+>               raise TimeoutError from exc_val
+E               TimeoutError
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\asyncio\timeouts.py:115: TimeoutError
+=========================== short test summary info ===========================
+FAILED tests/test_round4_browser.py::test_sequential_real_windows_reuse_persisted_profile
+1 failed, 181 passed in 92.05s (0:01:32)

@@ -33,6 +33,13 @@ class FakePlaywright:
         """Give each checker its own page and close callback."""
         self.directories.append(directory)
         context = SimpleNamespace(pages=[object()], close=AsyncMock())
+        async def new_page() -> object:
+            """Allocate a distinct page belonging to this context."""
+            page = object()
+            context.pages.append(page)
+            return page
+
+        context.new_page = AsyncMock(side_effect=new_page)
         self.contexts.append(context)
         return context
 
@@ -208,3 +215,62 @@ def test_duplicate_profile_cannot_be_used_concurrently(tmp_path: Path) -> None:
     """Two IDs must not silently reuse one persistent Chromium directory."""
     with pytest.raises(ValueError, match="separate browser profile"):
         MultiWorkerScraper(checkers=[Checker("one", tmp_path), Checker("two", tmp_path)])
+
+
+@pytest.mark.parametrize("checker_count", [1, 2, 3])
+def test_spare_pages_fill_workers_concurrently(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, checker_count: int,
+) -> None:
+    """Five tasks enter extraction together even with fewer than five accounts."""
+    scraper, browser = configure_pool(tmp_path, monkeypatch)
+    scraper.checkers = scraper.checkers[:checker_count]
+    seen_pages: set[int] = set()
+
+    async def scenario() -> list[dict]:
+        """A barrier fails instead of allowing sequential scheduling to pass."""
+        ready = asyncio.Event()
+
+        async def check(page: object, username: str) -> dict:
+            """Wait until all five independent pages have claimed a target."""
+            seen_pages.add(id(page))
+            if len(seen_pages) == 5:
+                ready.set()
+            await asyncio.wait_for(ready.wait(), timeout=2)
+            return {"username": username, "composite_status": "ACTIVE"}
+
+        monkeypatch.setattr(scraper, "_check_account", check)
+        return await scraper.run_async([f"target{i}" for i in range(15)])
+
+    records = asyncio.run(scenario())
+    assert len(records) == 15 and all(r["composite_status"] == "ACTIVE" for r in records)
+    assert len(seen_pages) == 5
+    assert len(browser.contexts) == checker_count
+    assert sum(len(c.pages) for c in browser.contexts) == 5
+    assert len(scraper.blocker_stats) == 5
+    assert len(scraper.active_checker_ids) == checker_count
+    assert all(c.close.await_count == 1 for c in browser.contexts)
+
+
+def test_extra_page_failure_keeps_existing_worker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An extra page failure degrades concurrency without dropping queued work."""
+    scraper, browser = configure_pool(tmp_path, monkeypatch)
+    scraper.checkers = scraper.checkers[:1]
+    original = browser.launch_persistent_context
+
+    async def launch(directory: str, **kwargs: object) -> SimpleNamespace:
+        """Keep the verified initial page but fail new-page allocation."""
+        context = await original(directory, **kwargs)
+        context.new_page = AsyncMock(side_effect=RuntimeError("allocation failed"))
+        return context
+
+    monkeypatch.setattr(browser, "launch_persistent_context", launch)
+    async def check(page: object, username: str) -> dict:
+        """Return a complete minimal result for each claimed target."""
+        return {"username": username, "composite_status": "ACTIVE"}
+
+    monkeypatch.setattr(scraper, "_check_account", check)
+    assert len(asyncio.run(scraper.run_async(["a", "b", "c"]))) == 3
+    assert "worker_warning" in scraper.checker_health["checker_1"]
+    assert not scraper.is_stopped

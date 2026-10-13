@@ -1,0 +1,133 @@
+{
+  "target_count": 95,
+  "elapsed_seconds": 1047.6569999999992,
+  "active_checker_ids": [
+    "checker_5"
+  ],
+  "worker_pages_observed": 5,
+  "contexts_observed": 1,
+  "blocker_count": 5,
+  "checker_health": {
+    "checker_5": {
+      "ig": null,
+      "threads": null
+    }
+  },
+  "stop_reason": null,
+  "settings": {
+    "mode": "combined",
+    "workers": 5,
+    "headless": true,
+    "debug_dump": true,
+    "min_delay": 4.0,
+    "max_delay": 8.0,
+    "dialog_timeout_s": 10.0,
+    "menu_click_timeout_s": 8.0,
+    "page_ready_timeout_s": 10.0
+  },
+  "returned": 95,
+  "unstarted_count": 0,
+  "error_rows": 95,
+  "zero_error_rows": 0,
+  "under_300_seconds": false,
+  "composite_status_counts": {
+    "ERROR": 42,
+    "ACTIVE": 53
+  },
+  "data_quality_counts": {
+    "Failed": 81,
+    "Partial": 14
+  },
+  "ig_status_counts": {
+    "error": 49,
+    "active": 43,
+    "not_found": 3
+  },
+  "threads_status_counts": {
+    "error": 60,
+    "active": 35
+  },
+  "ig_stage_counts": {
+    "identity": 49,
+    "about_dialog": 18,
+    "navigate": 3,
+    "about_menu": 14,
+    "complete": 11
+  },
+  "threads_stage_counts": {
+    "identity": 60,
+    "about_menu": 33,
+    "complete": 2
+  },
+  "field_counts": {
+    "ig_date_joined": 12,
+    "ig_country": 11,
+    "threads_date_joined": 2,
+    "threads_country": 2
+  },
+  "row_seconds": {
+    "mean": 47.24494736842105,
+    "max": 84.86,
+    "sum": 4488.27
+  },
+  "extractor_duration_by_terminal_stage": [
+    {
+      "platform": "ig",
+      "terminal_stage": "about_dialog",
+      "count": 18,
+      "aggregate_seconds": 501.12699999999495,
+      "mean_seconds": 27.840388888888608
+    },
+    {
+      "platform": "ig",
+      "terminal_stage": "about_menu",
+      "count": 14,
+      "aggregate_seconds": 342.0450000000019,
+      "mean_seconds": 24.431785714285848
+    },
+    {
+      "platform": "ig",
+      "terminal_stage": "complete",
+      "count": 11,
+      "aggregate_seconds": 258.9380000000001,
+      "mean_seconds": 23.53981818181819
+    },
+    {
+      "platform": "ig",
+      "terminal_stage": "identity",
+      "count": 49,
+      "aggregate_seconds": 1238.5439999999962,
+      "mean_seconds": 25.27640816326523
+    },
+    {
+      "platform": "ig",
+      "terminal_stage": "navigate",
+      "count": 3,
+      "aggregate_seconds": 32.953999999997905,
+      "mean_seconds": 10.984666666665968
+    },
+    {
+      "platform": "threads",
+      "terminal_stage": "about_menu",
+      "count": 33,
+      "aggregate_seconds": 782.9839999999967,
+      "mean_seconds": 23.72678787878778
+    },
+    {
+      "platform": "threads",
+      "terminal_stage": "complete",
+      "count": 2,
+      "aggregate_seconds": 43.04700000000048,
+      "mean_seconds": 21.52350000000024
+    },
+    {
+      "platform": "threads",
+      "terminal_stage": "identity",
+      "count": 60,
+      "aggregate_seconds": 1288.6589999999978,
+      "mean_seconds": 21.477649999999965
+    }
+  ],
+  "timing_limit": "Per-platform calls include navigation, waits, captures and dismissal. Terminal stage is not an exclusive stage timer; overlapping worker times must not be added to wall elapsed.",
+  "evidence_limit": "5 Threads final capture references are empty; not every failure has a complete screenshot."
+}

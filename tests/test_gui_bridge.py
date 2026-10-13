@@ -341,7 +341,7 @@ def test_checker_manager_selection_reaches_production_factory(
     app = gui_app
     requested = []
     monkeypatch.setattr(app, "_start_login", requested.append)
-    app._on_setup()
+    app._open_checker_manager()
     dialog = app._checker_dialog
     assert len(dialog.variables) == 5
     for variable in dialog.variables:
@@ -351,7 +351,7 @@ def test_checker_manager_selection_reaches_production_factory(
     assert len(scraper.checkers) == 5
     assert len({slot.profile_dir for slot in scraper.checkers}) == 5
     assert "live check on Start" in app._session_label.cget("text")
-    app._on_setup()
+    app._open_checker_manager()
     dialog = app._checker_dialog
     dialog._login(dialog.slots[3])
     assert requested[0].checker_id == "checker_4"
@@ -368,7 +368,7 @@ def test_checker_import_validates_then_launches_bound_accounts(
     source = tmp_path / "accounts.txt"
     source.write_text("invalid")
     monkeypatch.setattr(checker_dialog.filedialog, "askopenfilename", lambda **_: str(source))
-    gui_app._on_setup()
+    gui_app._open_checker_manager()
     dialog = gui_app._checker_dialog
     dialog._import()
     assert dialog.winfo_exists() and not requested
@@ -380,3 +380,16 @@ def test_checker_import_validates_then_launches_bound_accounts(
     assert accounts[0].username == checkers[0].username == "alice"
     assert gui_app._default_factory("combined", lambda *_: None).checkers == checkers
     assert "synthetic-password" not in gui_app.checker_store.path.read_text()
+
+
+
+def test_single_checker_setup_uses_direct_manual_flow(
+    gui_app: MetaInspectorApp, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The default Setup button avoids account import and the multi-slot dialog."""
+    requested = []
+    monkeypatch.setattr(gui_app, "_start_login", requested.append)
+    gui_app.setup_button.invoke()
+    assert len(requested) == 1
+    assert requested[0].profile_dir == gui_app.profile_dir
+    assert gui_app._checker_dialog is None

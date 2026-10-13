@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 async def run_pool(scraper: MultiWorkerScraper, users: list[str]) -> list[dict]:
     """Skip unhealthy contexts; only verified checkers consume the shared queue."""
     contexts: list[BrowserContext] = []
+    healthy: list[tuple[Checker, BrowserContext]] = []
     workers: list[tuple[Checker, Page]] = []
     records: dict[int, dict] = {}
     queue: asyncio.Queue[tuple[int, str]] = asyncio.Queue()
@@ -54,11 +55,15 @@ async def run_pool(scraper: MultiWorkerScraper, users: list[str]) -> list[dict]:
                     page = context.pages[0]
                     scraper.blocker_stats.append(await attach_resource_blocker(page))
                     workers.append((checker, page))
+                    healthy.append((checker, context))
                 except Exception as exc:
                     reason = f"Checker startup failed ({type(exc).__name__})"
                     scraper.checker_health[checker.checker_id] = {"error": reason}
                     logger.warning("Skipping %s: %s", checker.checker_id, reason)
-            scraper.active_checker_ids = [checker.checker_id for checker, _ in workers]
+            await _fill_worker_pages(scraper, healthy, workers)
+            scraper.active_checker_ids = list(dict.fromkeys(
+                checker.checker_id for checker, _ in workers
+            ))
             if not workers and not scraper.is_stopped:
                 scraper.stop("No healthy checker sessions. See checker health and use Setup.")
             if not scraper.is_stopped:
@@ -79,6 +84,37 @@ async def run_pool(scraper: MultiWorkerScraper, users: list[str]) -> list[dict]:
                 except Exception as exc:
                     logger.warning("Checker browser close failed (%s)", type(exc).__name__)
     return [records[index] for index in sorted(records)]
+
+
+async def _fill_worker_pages(
+    scraper: MultiWorkerScraper,
+    healthy: list[tuple[Checker, BrowserContext]],
+    workers: list[tuple[Checker, Page]],
+) -> None:
+    """Distribute spare worker pages over verified contexts without new logins."""
+    available = list(healthy)
+    index = 0
+    while available and len(workers) < scraper.workers and not scraper.is_stopped:
+        index %= len(available)
+        checker, context = available[index]
+        page = None
+        try:
+            page = await context.new_page()
+            stats = await attach_resource_blocker(page)
+            scraper.blocker_stats.append(stats)
+            workers.append((checker, page))
+        except Exception as exc:
+            reason = f"Additional worker page failed ({type(exc).__name__})"
+            logger.warning("%s: %s", checker.checker_id, reason)
+            scraper.checker_health[checker.checker_id]["worker_warning"] = reason
+            available.pop(index)
+            if page is not None:
+                try:
+                    await page.close()
+                except Exception as close_error:
+                    logger.warning("Worker page close failed (%s)", type(close_error).__name__)
+        else:
+            index += 1
 
 
 async def _consume(

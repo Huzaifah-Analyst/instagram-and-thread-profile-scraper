@@ -95,6 +95,11 @@ class MetaInspectorApp(ctk.CTk):
                                           fg_color=theme.BG_ELEVATED, hover_color=theme.BORDER_COLOR,
                                           border_color=theme.BORDER_COLOR, border_width=1, font=theme.FONT_BODY)
         self.setup_button.grid(row=0, column=2, padx=16, pady=12)
+        self.manage_button = ctk.CTkButton(
+            header, text="Manage checkers", command=self._open_checker_manager,
+            fg_color=theme.BG_ELEVATED,
+        )
+        self.manage_button.grid(row=0, column=3, padx=8, pady=12)
 
     def _default_factory(self, mode: str, callback: Callable[[int, int, dict], None]) -> MultiWorkerScraper:
         """Creates the production scraper for one run, using the panel's worker/timeout settings."""
@@ -152,7 +157,20 @@ class MetaInspectorApp(ctk.CTk):
         self._apply_state()
 
     def _on_setup(self) -> None:
-        """Open the five-slot checker account manager."""
+        """Start sequential setup directly when exactly one checker is selected."""
+        if self.bridge.state is not RunState.IDLE or self._login_running:
+            return
+        try:
+            selected = [slot for slot in self.checker_store.load() if slot.enabled]
+            if len(selected) == 1:
+                self._start_login(selected[0])
+            else:
+                self._open_checker_manager()
+        except (OSError, ValueError) as exc:
+            self.status_bar.message(f"Checker settings: {exc}", "error")
+
+    def _open_checker_manager(self) -> None:
+        """Open the optional multi-account manager without starting logins."""
         if self.bridge.state is not RunState.IDLE or self._login_running:
             return
         if self._checker_dialog is not None and self._checker_dialog.winfo_exists():
@@ -167,15 +185,16 @@ class MetaInspectorApp(ctk.CTk):
             self.status_bar.message(f"Checker settings: {exc}", "error")
 
     def _start_login(self, checker: Checker) -> None:
-        """Open this slot's official login tabs in the background thread."""
+        """Open this slot's sequential manual login windows in a background thread."""
         if self.bridge.state is not RunState.IDLE or self._login_running:
             return
         self._active_login = checker
+        self._login_cancel.clear()
         self._login_error = None
         self._login_summary = None
         self._login_thread = threading.Thread(target=self._login_worker, name="checker-login", daemon=True)
         self._login_thread.start()
-        self.status_bar.message(f"{checker.checker_id}: log in to BOTH Instagram and Threads tabs, then close the browser.", "warn")
+        self.status_bar.message(f"{checker.checker_id}: log in to Instagram and close its window; Threads opens next.", "warn")
         self._apply_state()
 
     def _start_import_login(self, accounts: list[AccountCredential], checkers: list[Checker]) -> None:
@@ -205,7 +224,11 @@ class MetaInspectorApp(ctk.CTk):
         """Background thread: runs the login browser until the user closes it."""
         try:
             profile = self._active_login.profile_dir if self._active_login else self.profile_dir
-            asyncio.run(login_session(profile))
+            self._login_summary = asyncio.run(login_session(
+                profile,
+                expected_username=self._active_login.username if self._active_login else None,
+                progress=self._login_updates.put, cancel=self._login_cancel,
+            ))
         except Exception as exc:  # noqa: BLE001 - thread boundary: report to the UI
             logger.exception("Login browser failed")
             self._login_error = str(exc).splitlines()[0] if str(exc) else type(exc).__name__
@@ -302,6 +325,7 @@ class MetaInspectorApp(ctk.CTk):
         self.left_panel.apply_state(self.bridge.state, start_allowed=not login)
         busy = login or self.bridge.state is not RunState.IDLE
         self.setup_button.configure(state="disabled" if busy else "normal")
+        self.manage_button.configure(state="disabled" if busy else "normal")
 
     def _refresh_session(self) -> None:
         """Show saved-login presence honestly; only preflight verifies live health."""

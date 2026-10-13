@@ -216,7 +216,20 @@ to a proven explanation.
 | P48 | Private authorized / live completion blocked | That continuation leads to Threads `/onboarding/` with a real Privacy Public/Private selection. This explains the current incomplete setup more precisely than the earlier broken-home page. User chose Private; the next attempts did not complete that selection or verify Threads identity. See P49. [Actual GUI follow-up](implementation/round3-live-checker-logins.md). |
 | P49 | Observed live sign-in blocker / explicit reporting implemented | Saved-account continuation returned a visible Threads alert Something went wrong at /login/. IG remained identity-verified. Exact ARIA/page evidence saved; underlying reason unknown. Production reports this alert without a redundant password fallback. Private setup, Combined sample and benchmark remain unverified. [Report](implementation/threads-saved-account-card.md). |
 
-P44 remains historically accurate for the earlier home-error capture, but the
+P44 remains historically accurate for the earlier home-error capture, but
 an earlier app-driven path reached a usable onboarding control; the latest attempt returned the P49 login error. No assumption
 that the account is permanently unusable or that the SVG selector caused this
 login failure is justified.
+
+
+### Round 4 - single-account concurrency, 13 October 2026
+
+| ID | State | Evidence and action |
+| --- | --- | --- |
+| P50 | Fixed / real Chromium and scheduler regression verified | With one checker and workers=5, run_pool previously opened only one worker page. It now fills spare slots with pages on healthy existing contexts. A real Chromium test requires five simultaneous targets, separate DOMs and one context; 20 results returned. Mixed-health behavior and active-challenge stop remain. [Task 2](implementation/round4-worker-concurrency.md). |
+| P51 | Fixed / synthetic and actual-app flow exercised | Setup previously opened IG and Threads tabs together and deferred live health to Start. Single-selected-checker Setup now opens IG alone, waits for closure, opens Threads on the same saved profile, waits, then checks both platforms and displays each result. Optional Manage checkers retains the older multi-account UI. [Task 1](implementation/round4-sequential-login.md). |
+| P52 | Resolved for checker_5 after manual onboarding / historical first attempt | User reported both manual windows completed. Post-close preflight verified IG but returned Threads broken-link page; subsequent read-only headed check showed a public feed with Log in or sign up for Threads and no verified own identity. User later clarified onboarding was incomplete; after P53 window sizing correction and manual completion, both identities verified. The authorized 95-target run then completed; see P54. [Benchmark](implementation/TSK-401-nfr1-benchmark.md). |
+
+| P53 | Fixed / user completion and live identity verified | User clarified that Threads remained on onboarding: Continue could not be reached and scrolling did not work. Manual setup used a fixed 1280x800 viewport. It now uses no fixed viewport and starts maximized, permitting native window resizing. Tests assert these settings; user completed onboarding in the reopened checker_5 setup and live preflight verified both platforms. This changes login windows, not extraction viewport. |
+
+| P54 | Open / measured live extraction and speed failure | 95-target Combined run returned all 95 rows in 1047.6569999999992 seconds using one verified checker context and five pages. Complete 0, Partial 14, Failed 81; all rows carry errors. Identity failures IG49/Threads60, Threads About-menu33, IG About-dialog18. Inspected captures include loading splash and menu spinner. Underlying readiness/network/server cause unproven; no five-minute acceptance. [Benchmark](implementation/TSK-401-nfr1-benchmark.md). |

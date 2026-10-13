@@ -1,8 +1,8 @@
 """Multi-worker concurrent dispatcher (TSK-105).
 
-Up to five independent persistent checker contexts consume a shared target
-queue. Each checker handles one target at a time and is verified on the
-requested platforms before work starts. Completed rows are streamed to the UI.
+Up to five worker pages consume a shared target queue across verified persistent
+checker contexts. Healthy contexts supply additional pages when fewer accounts
+than workers are selected. Completed rows are streamed to the UI.
 
 Usage from the command line::
 
@@ -142,7 +142,7 @@ def build_record(
 
 
 class MultiWorkerScraper:
-    """Checks targets in parallel using one page per independent checker login."""
+    """Checks targets on parallel pages allocated across verified checker logins."""
 
     def __init__(
         self,
@@ -164,7 +164,7 @@ class MultiWorkerScraper:
 
         Args:
             profile_dir: Chromium user-data dir holding the checker login session.
-            workers: Maximum number of active checker profiles (1 to 5).
+            workers: Number of concurrent worker pages (1 to 5).
             mode: ``ig_only``, ``threads_only`` or ``combined``.
             headless: Run Chromium without a visible window.
             min_delay: Minimum pause between accounts on one worker (seconds).
@@ -421,7 +421,7 @@ def main() -> None:
 
     if args.login or args.login_checker:
         slot = CheckerStore(args.profile).load()[(args.login_checker or 1) - 1]
-        asyncio.run(login_session(slot.profile_dir))
+        print(asyncio.run(login_session(slot.profile_dir, expected_username=slot.username)))
         return
 
     names = list(args.usernames)

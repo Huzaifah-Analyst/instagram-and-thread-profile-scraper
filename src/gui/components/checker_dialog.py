@@ -13,7 +13,7 @@ from src.gui import theme
 
 
 class CheckerDialog(ctk.CTkToplevel):
-    """Let operators select slots and open their official IG/Threads login tabs."""
+    """Let operators select slots and open their sequential IG/Threads login windows."""
 
     def __init__(
         self, master: ctk.CTk, store: CheckerStore,
@@ -36,7 +36,7 @@ class CheckerDialog(ctk.CTkToplevel):
         ).pack(pady=(16, 6))
         ctk.CTkLabel(
             self, text="Each checker needs Instagram AND Threads login in its own browser.\n"
-                       "Saved logins are verified live when you press Start. One worker per checker.",
+                       "Workers use separate pages; one healthy checker can supply all workers.",
         ).pack(pady=(0, 12))
         for slot in self.slots:
             row = ctk.CTkFrame(self)

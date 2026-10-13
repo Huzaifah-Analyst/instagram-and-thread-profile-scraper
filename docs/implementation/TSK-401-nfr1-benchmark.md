@@ -1,4 +1,100 @@
-# TSK-401: NFR-1 benchmark not run
+# TSK-401: live Combined benchmark - Round 4
+
+13 October 2026. Branch: `fix/single-account-worker-concurrency`.
+User changed the immediate request to **95 unique targets**. This result is for
+that actual list; it is not a completed 100-target NFR-1 benchmark.
+
+## Measured result
+
+**Elapsed: 1047.6569999999992 seconds**, measured without rounding with
+`time.monotonic()` around the full production `run_async` call, including
+startup/preflight and shutdown. Five-minute usable-results goal: **NOT MET**.
+No extrapolation to 100 targets, no comparison to a controlled earlier baseline.
+
+| Metric | Actual result |
+| --- | --- |
+| Unique targets / returned rows | 95 / 95 |
+| Unstarted / duplicate rows | 0 / 0 |
+| Checker / contexts / observed worker pages | checker_5 / 1 / 5 |
+| Independent resource blockers | 5 |
+| Live preflight | IG and Threads expected identity verified |
+| Composite status | ACTIVE 53, ERROR 42, BLOCKED 0 |
+| Data quality | Complete 0, Partial 14, Failed 81 |
+| Rows with extraction errors / error-free rows | 95 / 0 |
+| IG extracted dates / countries | 12 / 11 |
+| Threads extracted dates / countries | 2 / 2 |
+| Stop reason / journal error | none / none |
+
+ACTIVE describes detected account existence, not successful transparency extraction.
+No row has a complete usable Combined result. All returned rows and unrounded
+platform durations are retained locally. Only aggregate metrics are committed;
+per-account field values and individual timing rows are excluded from the push.
+
+Settings: Combined, workers=5, headless=True, debug_dump=True; per-worker pacing
+4-8 seconds; page-ready/dialog/menu budgets 10/10/8 seconds. Evidence capture costs
+are included in runtime. No stripped-debug equivalent was measured.
+
+## Observed bottlenecks and next work
+
+| Terminal extraction stage | IG calls | Threads calls |
+| --- | --- | --- |
+| identity verification failed | 49 | 60 |
+| About menu unavailable | 14 | 33 |
+| About dialog missing requested fields | 18 | 0 |
+| complete | 11 | 2 |
+| navigation / profile not found | 3 | 0 |
+
+Per-row recorded seconds: mean 47.24494736842105, maximum 84.86. Whole extractor
+calls ending at identity failure total 1238.5439999999962 seconds for IG and
+1288.6589999999978 for Threads across parallel workers. Threads calls ending at
+About-menu failure total 782.9839999999967 seconds. These overlapping call totals
+include navigation, waits, debug capture and dismissal; they are **not isolated
+stage timers** and must not be added to elapsed wall time.
+
+Directly inspected evidence (exact capture paths remain in the
+[local result's evidence fields](../../debug/round4-benchmark95.json)):
+
+- One IG identity-failure screenshot shows only the Instagram loading splash.
+  Of identity-failure captures, 31 IG and 26 Threads have empty visible body text.
+  This supports readiness problems for those captures, not a proven
+  identity-selector defect on all targets.
+- One Threads About-failure screenshot shows the correct target profile with its
+  menu open but a spinner instead of loaded items. A wrong SVG click is not
+  established for this case.
+- One IG About-failure screenshot shows the target profile/loading content without
+  an About dialog. Menu-open and About-click captures remain in its evidence chain.
+- One successful Threads extraction screenshot explicitly shows the target
+  identity, date and country matching the row. This validates that example,
+  not the other 94 targets. Individual account field values remain local.
+
+Next diagnostic priorities: measure navigation/header readiness and menu hydration
+separately under concurrency, inspect failed/pending document/script/API requests,
+and compare a small controlled one-page/five-page sample. Do not merely raise
+all timeouts or assert rate limiting, resource blocking, CPU saturation or a
+particular Meta server cause without that evidence. Five Threads final capture
+references are empty, so not every failure has complete screenshot evidence.
+
+## Reproduction and artifacts
+
+The agent ran the production scraper after the **user** manually completed login
+and onboarding in the actual app. Only checker_5 was selected. No checker 1/2/3
+login, account-file import, TOTP submission or profile reset occurred this round.
+
+- [Sanitized aggregate evidence](evidence/round4-benchmark95-summary.json).
+- [All 95 local rows](../../debug/round4-benchmark95.json) and
+  [190 local whole-platform call timings](../../debug/round4-benchmark95.json).
+- [Local full result](../../debug/round4-benchmark95.json),
+  [append-only journal](../../results/run_20261013_101042_427210.jsonl),
+  [local runner](../../debug/round4_benchmark95.py).
+- [Manual login proof](evidence/round4-live-setup.json),
+  [task report](round4-report.md), [test log](../test_log.md).
+
+Method: real saved profile, real Meta responses, production shared queue, wrappers
+that observe extractor durations and page/context identities without changing
+responses. Rejected: fabricating five additional targets, counting fast failure
+rows as success, bypassing identity verification, or extrapolating timings.
+
+Earlier rounds below are historical and superseded by the completed 95-target run.
 
 ## Round 3 decision, 12 October 2026
 

@@ -59,3 +59,7 @@ results/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Per-account benchmark exports remain local; publish aggregate metrics only.
+/docs/implementation/evidence/round4-benchmark95-rows.tsv
+/docs/implementation/evidence/round4-platform-timings.tsv
