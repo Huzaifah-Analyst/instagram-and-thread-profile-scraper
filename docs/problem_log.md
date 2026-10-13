@@ -293,3 +293,23 @@ test was run to confirm this specifically.
 
 Full suite after the retry fix: **190 passed**, zero skips. Checkers
 1/2/3/4 not opened in either confirmation batch.
+
+
+### Round 7 (Claude), 13 October 2026 - the 100-account benchmark
+
+Full report: [round7-benchmark100.md](implementation/round7-benchmark100.md).
+100 unique real targets (95 supplied + 5 from the project's own existing
+lists; none invented or duplicated), Combined, workers=5, checker_5 only.
+
+| ID | State | Evidence and action |
+| --- | --- | --- |
+| P62 | Confirmed live at scale | P57's Threads-404 fix: all 44 Threads `NOT_FOUND` rows in the 100-target run were re-checked against their own saved page captures -- 44/44 contain Threads' real 404 text, zero misclassifications. All 7 Instagram `NOT_FOUND` rows likewise verified 7/7. In Round 5 these same pages were reported as identity-verification failures. |
+| P63 | Confirmed live | P61's menu/dialog retry fired on exactly 2 targets (`damaris_9759`, `me_redith6621`, identified by their `*_2_*` captures) and **both recovered full data** (October 2025 / China). First live evidence of the retry rescuing a result, not just passing a synthetic test. Cost when it does not help: `lyricnixon292` spent 32.0s searching the menu twice -- the accepted trade-off. |
+| P64 | Open / likely not code-fixable | `lyricnixon292` is the **single genuine extraction failure in the entire 100-target run** (1 of 149 platform checks against existing accounts; 99.3% success). Threads account is real and active but renders no profile "More" control across both attempts; its capture shows an empty profile (0 followers, "No threads yet"). This matches the pre-existing documented quirk in `docs/memory.md` section 4 item 1 (inactive Threads profiles often have no About control). The produced output -- active, no transparency data, reason stated -- is the honest result if the control genuinely does not exist. |
+| P65 | Open / measured, decision needed from Huzaifah | **NFR-1 not met: 410.5s vs the 300s target.** A validated model explains it: work per worker 271.3s + deliberate 4-8s inter-target pacing 114.0s = 385.3s predicted vs 410.5s measured. Pacing is ~28% of wall time and exists to avoid the rate-limiting behind this project's earlier incidents (this run: **zero** blocks). Projections: 2-4s pacing ~328s (still over); 8 workers ~238s (under, but concurrent-page count is the exact variable implicated in Incident 5 and the account suspensions). Not changed silently -- this is a risk/throughput trade-off for Huzaifah to decide. |
+| P66 | Hypothesis tested and **disproved**, recorded | Debug captures were expected to be a meaningful cost (499 files written during the benchmark). Measured on 15 identical full-path targets: **87.9s with captures ON vs 119.9s with captures OFF** -- captures-off was slower, so live-site run-to-run variance (±36% on this sample) dominates any capture overhead. Turning captures off is **not** a route to 300s, and ~15-target single runs cannot measure effects smaller than roughly 40%. |
+
+**Data quality across the 100 targets: Complete 36, Partial 58, Not
+available 6, Failed 0.** The 58 Partial is dominated by the 44 targets that
+genuinely have no Threads profile at all (Combined mode requires both
+platforms for `Complete`), not by extraction failure -- 0 rows failed.

@@ -1,4 +1,49 @@
-# TSK-401: live Combined benchmark - Round 4
+# TSK-401: live Combined benchmark
+
+## Round 7: the 100-account benchmark, measured (Claude), 13 October 2026
+
+Branch `fix/extraction-root-cause-isolation`. **First actual 100-unique-target
+Combined run in this project.** Full write-up, field-by-field breakdown and
+verification: [round7-benchmark100.md](round7-benchmark100.md).
+
+**Measured: 100 accounts in 410.5 seconds (6m 50s). NFR-1's 300-second
+target is NOT MET.** 100/100 rows returned, 0 unstarted, 0 duplicated,
+0 BLOCKED, 0 rows with `Failed` data quality.
+
+| Metric | Result |
+| --- | ---: |
+| Elapsed (unrounded, CLI-reported) | 410.5s |
+| Per target | 4.11s |
+| Rows returned / queued | 100 / 100 |
+| Data quality | Complete 36, Partial 58, Not available 6, Failed 0 |
+| Instagram: accounts that exist / both fields read / platform withheld country / **extraction failures** | 93 / 91 / 2 / **0** |
+| Threads: accounts that exist / both fields read / platform withheld country / **extraction failures** | 56 / 44 / 15 / **1** |
+| Genuine extraction failures across all platform checks | **1 of 149 (99.3% success)** |
+| Session blocks | 0 |
+
+The 100-target list is 95 supplied + 5 from the project's own pre-existing
+lists; nothing invented or duplicated. All 44 Threads and 7 Instagram
+`NOT_FOUND` classifications were re-verified against their own saved page
+captures (51/51 genuine). The single failure (`lyricnixon292`) is an empty
+Threads profile that renders no About control -- the quirk already recorded
+in `docs/memory.md` section 4.
+
+**Why the gap:** a validated arithmetic model accounts for the wall time --
+work per worker 271.3s + deliberate 4-8s inter-target pacing 114.0s =
+385.3s predicted vs 410.5s measured. **Pacing alone is ~28% of the run** and
+exists to avoid the rate-limiting/challenge behaviour behind this project's
+earlier incidents (this run hit zero blocks). Model projections: 2-4s pacing
+~328s (still over); 8 workers ~238s (under, but more concurrent pages is the
+exact variable implicated in Incident 5 and in the earlier account
+suspensions -- a risk decision for Huzaifah, not a silent change).
+
+A tested-and-disproved hypothesis is recorded there too: debug captures are
+**not** the bottleneck (15 targets ran 87.9s with captures on vs 119.9s with
+them off -- live-site variance of ±36% dominates).
+
+---
+
+## Round 4 (historical, pre-fix)
 
 ## Round 5: 50-account Combined recheck (Claude continuation), 13 October 2026
 
