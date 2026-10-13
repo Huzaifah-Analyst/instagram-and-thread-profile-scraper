@@ -313,3 +313,20 @@ lists; none invented or duplicated), Combined, workers=5, checker_5 only.
 available 6, Failed 0.** The 58 Partial is dominated by the 44 targets that
 genuinely have no Threads profile at all (Combined mode requires both
 platforms for `Complete`), not by extraction failure -- 0 rows failed.
+
+
+## Round 8 ? output selection, exports and measurements (13 October 2026)
+
+| ID | State | Evidence and action |
+| --- | --- | --- |
+| P67 | Implemented / ported tests pass | Current branch lacked existing sprint3 clipboard, CSV/Excel and history features. Ported file by file, retained formula protection, added current quality/availability columns and complete modern record storage via an additive history table. Original ported test files remain byte-identical. [Report](implementation/round8-export-port.md). |
+| P68 | Implemented / real Tk verification | Output selection was fixed. Added persistent modal column selection; Username mandatory; all-optional-off retains Status. User clarified quality/availability diagnostics must also be optional. Clipboard, CSV, Excel and history use the same selection. Corrupt settings fall back with a status-bar warning. [Report](implementation/round8-output-selection.md). |
+| P69 | Implemented / synthetic timing passes / live saving NOT established | Stable populated dialogs now return after four unchanged poll intervals; changing content resets the counter. No timeout/pacing/worker changes. Same 12 targets measured 156.9s before vs 213.6s after, with more navigation/identity/dialog failures after. No projected saving claimed. [Report](implementation/round8-stable-dialog.md). |
+| P70 | Analysis corrected / regression added | Round7 analyzer counted literal Not shared as a present country and could attribute missing date/badge to a country disclosure flag. Extended existing analyzer: withheld applies only to country, not unrelated fields. Recomputed historical Combined country totals: IG 86 present / 7 absent-account / 7 withheld; Threads 40 present / 44 absent-account / 15 withheld / 1 failed. Timing remains 410.5s. |
+| P71 | Open / reproduced in fresh live runs | Round8 small runs and IG-only benchmark show substantially worse live rendering/navigation than Round7. IG-only: 100 rows in 584.6s, 41 target extraction failures; stages complete 52, navigate 17 (including 7 real not-found), identity 20, dialog 11. Logs include ERR_NETWORK_CHANGED and navigation timeouts. Underlying cause not isolated; neither stable polling nor live variance alone proven responsible. Do not claim zero errors or NFR-1 acceptance. |
+
+Round8 P65/P71 follow-up: Threads-only measured **359.9s** with 9 extraction
+failures (7 about_dialog, 2 about_menu); no 300s acceptance. Both per-mode
+runs returned exactly 100 targets with no duplicates/unstarted or session
+blocks. Final suite **222 passed**; live rendering failures remain open.
+[All mode measurements and limits](implementation/round8-mode-benchmarks.md).

@@ -1,0 +1,81 @@
+................FF...F.........                                          [100%]
+================================== FAILURES ===================================
+__________________ test_creates_schema_from_architecture_doc __________________
+
+tmp_path = WindowsPath('C:/Users/huzai/Downloads/alizakhan/.pytest-local-temp-round8-targeted/test_creates_schema_from_archi0')
+
+    def test_creates_schema_from_architecture_doc(tmp_path: Path) -> None:
+        path = tmp_path / "sub" / "history.db"
+        HistoryDB(path)
+        assert path.exists()
+        conn = sqlite3.connect(path)
+        runs_cols = [r[1] for r in conn.execute("PRAGMA table_info(runs)")]
+        item_cols = [r[1] for r in conn.execute("PRAGMA table_info(run_items)")]
+        conn.close()
+        assert runs_cols == ["run_id", "created_at", "mode", "total_accounts", "active_count",
+                             "banned_count", "duration_seconds"]
+>       assert item_cols == ["id", "run_id", "username", "composite_status", "ig_country", "ig_date_joined",
+                             "threads_country", "threads_date_joined", "threads_badge", "error_message"]
+E       AssertionError: assert ['id', 'run_i..._joined', ...] == ['id', 'run_i..._joined', ...]
+E
+E         Left contains one more item: 'record_json'
+E         Use -v to get more diff
+
+tests\test_history_db.py:29: AssertionError
+___________________________ test_save_and_read_back ___________________________
+
+tmp_path = WindowsPath('C:/Users/huzai/Downloads/alizakhan/.pytest-local-temp-round8-targeted/test_save_and_read_back0')
+
+    def test_save_and_read_back(tmp_path: Path) -> None:
+        db = HistoryDB(tmp_path / "history.db")
+        run_id = db.save_run(RECORDS, "combined", total_accounts=5, duration_seconds=31.456, created_at=WHEN)
+        assert run_id == "RUN_20261004_193000"
+
+        [run] = db.list_runs()
+        assert run == {"run_id": run_id, "created_at": "2026-10-04 19:30:00", "mode": "combined",
+                       "total_accounts": 5, "active_count": 1, "banned_count": 1, "duration_seconds": 31.46}
+
+        items = db.get_run_items(run_id)
+        assert [i["username"] for i in items] == ["elif", "bad", "ghost"]  # original order kept
+        assert items[0]["ig_country"] == "T�rkiye"
+        assert items[1]["error_message"] == "x"
+>       assert "seconds" not in items[0]  # not part of the schema
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert 'seconds' not in {'username': 'elif', 'composite_status': 'ACTIVE', 'ig_country': 'T�rkiye', 'ig_date_joined': 'Eyl�l 2019', ...}
+
+tests\test_history_db.py:46: AssertionError
+___________ test_real_popup_drives_clipboard_csv_excel_and_persists ___________
+
+tmp_path = WindowsPath('C:/Users/huzai/Downloads/alizakhan/.pytest-local-temp-round8-targeted/test_real_popup_drives_clipboa0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000022B79BCABD0>
+
+    def test_real_popup_drives_clipboard_csv_excel_and_persists(tmp_path: Path,
+                                                             monkeypatch: pytest.MonkeyPatch) -> None:
+        """Click actual widgets, export actual files and reopen saved preferences."""
+        app = MetaInspectorApp(profile_dir=tmp_path / "profile")
+        destination = tmp_path / "results.csv"
+        monkeypatch.setattr("src.gui.actions.filedialog.asksaveasfilename", lambda **kw: str(destination))
+        try:
+            app.update()
+            app.table.add_record({"username": "target", "ig_country": "Canada",
+                                  "ig_date_joined": "April 2016", "data_quality": "Partial"})
+            app.status_bar.set_results_available(True)
+            app.status_bar.csv_button.invoke()
+            before_csv = headers(destination)
+            app.status_bar.copy_button.invoke()
+            before_tsv = app.clipboard_get().splitlines()[0].split("\t")
+            assert before_tsv == list(DEFAULT_NAMES)
+            app.status_bar.output_button.invoke()
+            app.update()
+            popup = app.output_actions.dialog
+            assert popup.checkboxes["Username"].cget("state") == "disabled"
+>           popup.checkboxes["IG Country"].invoke()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: 'CTkCheckBox' object has no attribute 'invoke'
+
+tests\test_output_selection.py:42: AttributeError
+=========================== short test summary info ===========================
+FAILED tests/test_history_db.py::test_creates_schema_from_architecture_doc - ...
+FAILED tests/test_history_db.py::test_save_and_read_back - AssertionError: as...
+FAILED tests/test_output_selection.py::test_real_popup_drives_clipboard_csv_excel_and_persists
+3 failed, 28 passed in 9.29s

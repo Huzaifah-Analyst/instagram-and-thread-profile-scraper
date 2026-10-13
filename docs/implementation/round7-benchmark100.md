@@ -44,6 +44,13 @@ usable-data rates improved far more (below).
 | Not available (genuinely no account) | - | 6 |
 | Rows carrying any error text | 95 / 95 | **21 / 100** |
 
+> Round 8 analysis correction: the original table below counted literal
+> `Not shared` as present. Re-analysis of the same saved records finds IG
+> country **86 present / 7 account-absent / 7 withheld / 0 failed**, and
+> Threads country **40 present / 44 account-absent / 15 withheld / 1 failed**.
+> Date/badge counts and elapsed 410.5s are unchanged. Historical numbers below
+> are retained with this correction; use the Round 8 report for current totals.
+
 ## Field-level completeness, and the reason for every missing value
 
 Five requested data fields x 100 targets. Every "missing" below is

@@ -1,3 +1,9 @@
+> **Latest update ? Round 8:** output selection, clipboard/CSV/Excel and history
+> implemented; 222 tests pass. Fresh 100-target IG-only 584.6s and Threads-only
+> 359.9s; both exceed 300s and have extraction failures. Historical Combined
+> baseline is 410.5s. Checker 5 was usable for these runs; the older login
+> snapshot below is historical. See [current report](round8-mode-benchmarks.md).
+
 # MetaInspector progress report - 13 October 2026
 
 **Round 4 code implement aur live test ho gaya. Checker 5 ke IG + Threads logins

@@ -21,7 +21,7 @@ from src.gui import theme
 from src.gui.bridge import ErrorEvent, FinishedEvent, ProgressEvent, RunState, ScraperBridge, ScraperFactory
 from src.gui.components.data_table import DataTable
 from src.gui.components.left_panel import LeftPanel
-from src.gui.components.status_bar import StatusBar
+from src.gui.output_actions import OutputActions
 from src.gui.components.checker_dialog import CheckerDialog
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,8 @@ class MetaInspectorApp(ctk.CTk):
         self.left_panel.grid(row=1, column=0, sticky="nsw")
         self.table = DataTable(self)
         self.table.grid(row=1, column=1, sticky="nsew", padx=14, pady=14)
-        self.status_bar = StatusBar(self)
+        self.output_actions = OutputActions(self, self.table, self.checker_store.path.parent)
+        self.status_bar = self.output_actions.bar
         self.status_bar.grid(row=2, column=0, columnspan=2, sticky="ew")
 
         self._refresh_session()
@@ -128,10 +129,12 @@ class MetaInspectorApp(ctk.CTk):
             self.status_bar.message("Paste at least one username first.", "warn")
             return
         self.table.clear()
+        self.status_bar.set_results_available(False)
         self._total, self._done = len(usernames), 0
         self.status_bar.set_progress(0, self._total)
         self.status_bar.set_timing(0, None)
         mode = self.left_panel.mode
+        self._run_mode = mode
         try:
             self.bridge.start(usernames, mode)
         except (OSError, ValueError) as exc:
@@ -253,6 +256,7 @@ class MetaInspectorApp(ctk.CTk):
             if isinstance(event, ProgressEvent):
                 self._done = event.done
                 self.table.add_record(event.record)
+                self.status_bar.set_results_available(True)
                 self.status_bar.set_progress(event.done, event.total)
             elif isinstance(event, FinishedEvent):
                 self._on_finished(event)
@@ -318,6 +322,12 @@ class MetaInspectorApp(ctk.CTk):
                 f"{checked}/{self._total} checked; {len(event.active_checkers)} healthy at start. "
                 + " | ".join(notices), "warn",
             )
+
+        self.output_actions.save_run(
+            event.records, getattr(self, "_run_mode", self.left_panel.mode),
+            self._total, event.elapsed,
+        )
+        self.status_bar.set_results_available(bool(self.table.records))
 
     def _apply_state(self) -> None:
         """Syncs button states with the bridge and login status."""

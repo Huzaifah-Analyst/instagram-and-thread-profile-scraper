@@ -1,0 +1,41 @@
+{
+  "elapsed_seconds": 156.9,
+  "rows": 12,
+  "unique_rows": 12,
+  "meets_300_seconds": false,
+  "fields": {
+    "ig_country": {
+      "present": 8,
+      "platform-withheld": 1,
+      "extraction-failed": 3
+    },
+    "ig_date_joined": {
+      "present": 9,
+      "extraction-failed": 3
+    },
+    "threads_country": {
+      "platform-withheld": 8,
+      "extraction-failed": 3,
+      "present": 1
+    },
+    "threads_date_joined": {
+      "present": 9,
+      "extraction-failed": 3
+    },
+    "threads_badge": {
+      "present": 9,
+      "extraction-failed": 3
+    }
+  },
+  "quality": {
+    "Partial": 8,
+    "Failed": 3,
+    "Complete": 1
+  },
+  "status": {
+    "ACTIVE": 12
+  },
+  "checkers": {
+    "checker_5": 12
+  }
+}

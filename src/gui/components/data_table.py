@@ -27,7 +27,7 @@ COLUMNS = (
     ("duration", "Duration", 65, "e"),
     ("error", "Error", 160, "w"),
 )
-_STYLE = "MetaInspector.Treeview"
+TREE_STYLE = _STYLE = "MetaInspector.Treeview"
 _ERROR_CELL_MAX_CHARS = 200
 
 
@@ -78,7 +78,7 @@ def record_to_row(position: int, record: dict) -> tuple[str, ...]:
 class DataTable(ctk.CTkFrame):
     """Scrollable, colour-coded results grid."""
 
-    def __init__(self, master: ctk.CTkBaseClass) -> None:
+    def __init__(self, master: ctk.CTkBaseClass, title: str = "Live Results") -> None:
         """Builds the table inside a surface-coloured frame."""
         super().__init__(master, fg_color=theme.BG_SURFACE, corner_radius=8)
         self.grid_columnconfigure(0, weight=1)
@@ -86,7 +86,7 @@ class DataTable(ctk.CTkFrame):
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=14, pady=(12, 8))
-        ctk.CTkLabel(header, text="Live Results", font=theme.FONT_SECTION,
+        ctk.CTkLabel(header, text=title, font=theme.FONT_SECTION,
                      text_color=theme.TEXT_PRIMARY).pack(side="left")
         self._summary = ctk.CTkLabel(header, text="", font=theme.FONT_CAPTION, text_color=theme.TEXT_MUTED)
         self._summary.pack(side="right")
@@ -120,6 +120,12 @@ class DataTable(ctk.CTkFrame):
         self.records.clear()
         self._counts.clear()
         self._summary.configure(text="")
+
+    def set_records(self, records: list[dict]) -> None:
+        """Replace table rows with a previously saved run."""
+        self.clear()
+        for record in records:
+            self.add_record(record)
 
     def add_record(self, record: dict) -> None:
         """Appends one finished account and scrolls it into view."""

@@ -12,6 +12,7 @@ from src.core.about_parser import has_username, parse_about_dialog
 from src.core.browser_helpers import DIALOG_TIMEOUT_S, POLL_INTERVAL_S
 
 logger = logging.getLogger(__name__)
+STABLE_DIALOG_POLLS = 4
 
 
 async def _poll_dialog(
@@ -22,12 +23,16 @@ async def _poll_dialog(
 ) -> dict:
     """Read only visible matching dialogs; allow remaining fields to arrive.
 
-    A date-only dialog is returned at the deadline as partial data; a missing
-    country is never guessed or replaced with a prior account's value.
+    A populated panel stable for four poll intervals may return partial data.
+    Changing panels retain the full deadline for late fields to arrive.
     """
     best = {"date_joined": None, "join_badge": None, "country": None}
     deadline = time.monotonic() + dialog_timeout_s
+    previous_text: str | None = None
+    stable_polls = 0
     while time.monotonic() < deadline:
+        cycle_text: str | None = None
+        cycle_score = 0
         for selector in container_selectors:
             dialogs = page.locator(selector)
             # Fallback div selectors also match page-sized ancestors. Inspect
@@ -52,10 +57,20 @@ async def _poll_dialog(
                     continue
                 parsed = parse_about_dialog(text)
                 score = sum(bool(parsed[key]) for key in ("date_joined", "country"))
+                if score > cycle_score:
+                    cycle_text, cycle_score = text, score
                 best_score = sum(bool(best[key]) for key in ("date_joined", "country"))
                 if score and score >= best_score:
                     best = parsed
                 if parsed["date_joined"] and parsed["country"]:
                     return parsed
+        # Count once per polling cycle, never once per overlapping selector.
+        if cycle_text is not None and cycle_text == previous_text:
+            stable_polls += 1
+        else:
+            stable_polls = 0
+        previous_text = cycle_text
+        if stable_polls >= STABLE_DIALOG_POLLS:
+            return best
         await asyncio.sleep(min(POLL_INTERVAL_S, max(0, deadline - time.monotonic())))
     return best
