@@ -1,6 +1,6 @@
 # MetaInspector central problem log
 
-Updated: 2026-10-12. Branch: `fix/resilience-and-root-cause`.
+Updated: 2026-10-13. Branch: `fix/resilience-and-root-cause`.
 This is the single running inventory of problems. Confirmed observations,
 reproduced code defects and unverified hypotheses are distinguished explicitly.
 Test executions remain in [test_log.md](test_log.md).
@@ -8,7 +8,7 @@ Test executions remain in [test_log.md](test_log.md).
 ## Current implementation status
 
 **Round 3 supersedes the historical status bullets below.** Full suite:
-**170 passed in 40.00s**, zero skips. Partial checker health, independent platform
+**172 passed in 29.19s**, zero skips (latest follow-up). Partial checker health, independent platform
 exceptions and claimed-target error retention are regression-tested. Live setup
 attempted all five: **IG 1/5, Threads 0/5, both-platform 0/5**. Checker_2 has an
 actual suspension notice; checker_4/5 Threads home returns an error screen after
@@ -207,3 +207,16 @@ and one older live attempt submitted OTP but did not verify a session. It remain
 distinct from the newly observed suspension/onboarding blockers. P02/P14 remain
 open across the full batch; no repeated-date or hydration hypothesis was promoted
 to a proven explanation.
+
+### Actual GUI follow-up, 13 October 2026
+
+| ID | State | Evidence and action |
+| --- | --- | --- |
+| P47 | Fixed / current-card and delayed-error Chromium regressions pass | Actual checker_5 Threads login displays `Join using your Meta Account` with its saved username. Production now matches this card within an exact username scope, independent of image-alt text in its accessible name. Agent selected the actual button in the app-created browser; its concatenated textContent must not be confused with its accessible name. |
+| P48 | Private authorized / live completion blocked | That continuation leads to Threads `/onboarding/` with a real Privacy Public/Private selection. This explains the current incomplete setup more precisely than the earlier broken-home page. User chose Private; the next attempts did not complete that selection or verify Threads identity. See P49. [Actual GUI follow-up](implementation/round3-live-checker-logins.md). |
+| P49 | Observed live sign-in blocker / explicit reporting implemented | Saved-account continuation returned a visible Threads alert Something went wrong at /login/. IG remained identity-verified. Exact ARIA/page evidence saved; underlying reason unknown. Production reports this alert without a redundant password fallback. Private setup, Combined sample and benchmark remain unverified. [Report](implementation/threads-saved-account-card.md). |
+
+P44 remains historically accurate for the earlier home-error capture, but the
+an earlier app-driven path reached a usable onboarding control; the latest attempt returned the P49 login error. No assumption
+that the account is permanently unusable or that the SVG selector caused this
+login failure is justified.

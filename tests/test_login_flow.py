@@ -57,6 +57,36 @@ def test_observed_threads_compound_continue_button() -> None:
     browser_case(check)
 
 
+@pytest.mark.parametrize("outcome", ["verified", "error"])
+def test_saved_meta_card_with_image_alt_and_password_form(outcome: str) -> None:
+    """The exact current card is usable despite image labels and another form."""
+    async def check(page: Page) -> None:
+        """Select the matching account without entering a redundant password."""
+        finish = (
+            "document.cookie='sessionid=fake; path=/';"
+            "document.body.innerHTML='<a href=/@alice>Profile</a>'"
+            if outcome == "verified" else
+            "setTimeout(()=>{document.body.innerHTML='<div role=alert>Something went wrong</div>'},200)"
+        )
+        html = '''<input autocomplete="username"><input type="password">
+        <button onclick="window.passwordSubmitted=true">Log in</button><button onclick="window.wrong=true">
+        Join using your Meta Account<span>alice_other</span></button>
+        <button onclick="window.untouched=[...document.querySelectorAll('input')].every(e=>!e.value);
+        ''' + finish + '''"><img alt="A Threads user's profile picture">
+        <span>Join using your Meta Account</span><span>alice</span><img alt="Log in"></button>'''
+        await page.route("**/*", lambda route: route.fulfill(
+            body=html, content_type="text/html; charset=utf-8",
+        ))
+        result = await login_platform(page, "threads", ACCOUNT, threading.Event(), 3)
+        assert result.ready is (outcome == "verified")
+        if outcome == "error":
+            assert "Something went wrong" in result.message
+        assert await page.evaluate("window.untouched")
+        assert await page.evaluate("window.wrong === undefined")
+        assert await page.evaluate("window.passwordSubmitted === undefined")
+    browser_case(check)
+
+
 @pytest.mark.parametrize("url,allowed", [
     ("https://www.instagram.com/accounts/login/", True), ("https://www.threads.com/login", True),
     ("http://www.instagram.com/login", False), ("https://instagram.com.evil.test/", False),

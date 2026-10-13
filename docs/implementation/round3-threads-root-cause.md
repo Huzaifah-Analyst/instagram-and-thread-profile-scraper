@@ -7,12 +7,14 @@ target extraction could be attempted with a healthy checker.
 ## Observed causes of these attempts
 
 1. Checker_1 had an IG session cookie but **no Threads session cookie**. Its
-   visible continuation button's accessible text was exactly
+   visible continuation button's concatenated DOM text was
    `Continue with InstagramLog in`. The previous anchored expression accepted
-   only `Continue with Instagram`, so this actual control could not match.
+   only `Continue with Instagram`. That DOM text alone does not establish the
+   browser's full accessible name; the recorded fixture proves compatibility
+   with that variant, not a live successful click on this account.
    The exact compound form is now recognized and exercised in local Chromium.
-   This explains the missing continuation action, not whether the restricted IG
-   account could ultimately authenticate Threads.
+   Live continuation and whether the restricted IG account could ultimately
+   authenticate Threads were not established for checker_1.
 2. Checker_2/3 remained on a Threads password form without a Threads cookie after
    one submission. Saved metadata contains no invalid-code/password rejection
    marker. We cannot distinguish a server refusal from another UI/network
@@ -46,3 +48,16 @@ cookie/identity state. Rejected: guessing a new SVG coordinate, increasing all
 timeouts, or treating an IG login as Threads authentication. Remaining work is a
 fresh authenticated target capture after manual setup restores at least one
 checker; server-side reason for the onboarding/broken-page response is unknown.
+
+## Actual app follow-up, 13 October 2026
+
+The agent drove the actual Setup and checker_5 Login controls. Its IG feed passed
+identity verification; Threads offered the distinct `Join using your Meta Account`
+button. Selecting the real visible control by its text and expected username
+reached **Privacy: Public profile / Private profile** at `/onboarding/`. This is
+direct evidence of incomplete profile setup. The prior generic home-error screen
+did not establish that this setup could not be completed through its login flow.
+
+The user subsequently authorized Private. A fresh saved-account continuation returned the visible Something went wrong alert; setup remains incomplete. No final
+profile creation or successful Threads identity check is claimed yet. See
+[actual GUI follow-up and raw evidence](round3-live-checker-logins.md).

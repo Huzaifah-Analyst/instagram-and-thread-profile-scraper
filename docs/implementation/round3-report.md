@@ -1,11 +1,17 @@
 # Round 3 implementation and observed acceptance
 
+Follow-up on 13 October: the agent opened the actual desktop app and operated its
+Setup controls. Checker_5 IG feed/identity verified; selecting its Threads Meta
+account continuation reached the real **Privacy Public/Private** onboarding step.
+User chose Private; later continuation returned Something went wrong and setup remains incomplete; see [GUI follow-up](round3-live-checker-logins.md).
+This refines the earlier login blocker without claiming completed Threads setup.
+
 12 October 2026. Branch `fix/resilience-and-root-cause`, based on the pulled,
 up-to-date `fix/data-accuracy-and-nfr1-verification` at `3615193`. No merge or branch
 deletion is part of this task. The unrelated IDE report for another project was
 not modified.
 
-**Automated acceptance: 170 passed in 40.00s, zero skips**, complete pytest suite.
+**Latest automated acceptance: 172 passed in 29.19s, zero skips**, complete pytest suite, including the current Meta-account card follow-up. [Latest output](evidence/meta-card-final.txt). Earlier Round 3 acceptance: 170 passed in 40.00s.
 [Output](evidence/round3-full-acceptance.txt). Earlier 60-test subset and the first
 full run's three failures remain in [test_log.md](../test_log.md), with reasons.
 The new fixture redirect escaped initial routing; replacing it with a local

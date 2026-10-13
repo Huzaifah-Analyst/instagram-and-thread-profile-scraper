@@ -60,6 +60,27 @@ async def click_named(page: Page, expression: str) -> bool:
     return False
 
 
+async def click_saved_threads_account(page: Page, username: str) -> bool:
+    """Use an observed saved-account card only when its exact username matches.
+
+    Image alternative text contributes to the card's accessible name, so an
+    anchored match against its concatenated textContent cannot identify it.
+    """
+    cards = page.get_by_role("button").filter(
+        has_text="Join using your Meta Account",
+    )
+    for index in range(await cards.count()):
+        card = cards.nth(index)
+        own_name = card.get_by_text(username, exact=True)
+        if (await card.is_visible() and await own_name.count()
+                and await own_name.first.is_visible()):
+            if not official_url(page.url):
+                return False
+            await card.click(timeout=3000, no_wait_after=True)
+            return True
+    return False
+
+
 async def identity_matches(page: Page, platform: str, username: str) -> bool:
     """Require a platform session cookie and its own visible profile link."""
     host = urlsplit(page.url).hostname or ""
@@ -151,6 +172,15 @@ async def _login_platform(
             return LoginOutcome(platform, False, "Login or 2FA was rejected; check account details and device time.")
         if await identity_matches(page, platform, credential.username):
             return LoginOutcome(platform, True, "Login verified for the imported account.")
+        if platform == "threads" and continue_sent:
+            error = await visible(page.get_by_role("alert").filter(
+                has_text=re.compile(r"^something went wrong$", re.I),
+            ))
+            if error is not None:
+                return LoginOutcome(
+                    platform, False,
+                    "Threads reported Something went wrong during sign-in.",
+                )
         if (platform == "threads" and not returned_to_threads
                 and await identity_matches(page, "ig", credential.username)):
             # An Instagram 2FA handoff may finish at Instagram's own feed.
@@ -181,7 +211,13 @@ async def _login_platform(
             otp_sent = True
         elif otp_input is not None and not authenticator:
             return LoginOutcome(platform, False, "Email/SMS or unrecognized verification needs manual entry.")
-        elif not password_sent:
+        elif not password_sent and not continue_sent:
+            if platform == "threads" and not continue_sent:
+                continue_sent = await click_saved_threads_account(
+                    page, credential.username,
+                )
+                if continue_sent:
+                    continue
             password = await visible(page.locator('input[type="password"]'))
             username = await visible(page.locator(
                 'input[name="username"], input[name="email"], input[autocomplete~="username"], '
