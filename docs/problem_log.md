@@ -330,3 +330,22 @@ failures (7 about_dialog, 2 about_menu); no 300s acceptance. Both per-mode
 runs returned exactly 100 targets with no duplicates/unstarted or session
 blocks. Final suite **222 passed**; live rendering failures remain open.
 [All mode measurements and limits](implementation/round8-mode-benchmarks.md).
+
+
+### Round 9 (Claude review of Codex's Round 8), 13 October 2026
+
+Full report: [round9-ig-only-clean-rerun.md](implementation/round9-ig-only-clean-rerun.md).
+
+| ID | State | Evidence and action |
+| --- | --- | --- |
+| P72 | Resolved / measurement invalidated and repeated | Round 8's Instagram Only result (584.6s, 41 extraction failures) was contaminated by a **transient loss of internet connectivity on this machine**: its 10 hard network errors (`ERR_INTERNET_DISCONNECTED`, `ERR_NETWORK_CHANGED`, `ERR_CONNECTION_CLOSED`) all cluster inside a 16-second window, 17:00:48-17:01:04. Round 8's stable-panel polling was ruled out as a cause -- `_poll_dialog` runs after `profile_matches()`, so it cannot produce identity failures. Clean re-run on a verified-stable network: **426.1s, 93 complete, 0 extraction failures, 86 real IG countries, 93 dates, 7 genuine NOT_FOUND** -- field counts identical to Round 7's Combined run for Instagram. |
+| P73 | Correction to a previous claim of mine | My Round 7 analyser counted the literal string `"Not shared"` as a present country (it tested truthiness only). IG country was reported 91 present, actually **86 real + 5 `Not shared`**; Threads 44 present, actually **40 real + 4 `Not shared`**. Extraction-failure and date/badge counts were unaffected. Codex found this; I confirmed it independently against the same saved records. Its corrected analyser plus accounting regression test is the fix. |
+| P74 | Correction to a previous recommendation of mine | After Round 7 I advised that selecting Instagram Only would be a significant zero-risk speed win (reasoning that Threads was ~30% of work time). **Measurement disproves it:** IG-only 426.1s vs Combined 410.5s -- no speedup, difference well inside the +/-36% run-to-run variance. Two reasons: the 4-8s pacing is per *target* not per *platform* (so ~114s/worker is unchanged by dropping a platform), and Threads contributed little work anyway because 44 of 100 targets have no Threads profile and resolve as fast 404s. Mode selection is a legitimate feature, but it is **not** a route to NFR-1. |
+| P75 | Open / unchanged | **No mode meets NFR-1's 300s:** Combined 410.5s, Instagram Only 426.1s, Threads Only 359.9s. The only remaining levers are pacing and worker count, both of which carry the ban risk behind this project's earlier incidents. Decision for Huzaifah. |
+
+Codex's Round 8 delivery independently verified: full suite **222 passed**,
+zero skips; `EXPORT_COLUMNS` extended with Data Quality and both country
+availability columns while `SHEET_COLUMNS` correctly stayed clean at 6;
+output settings confirmed against the real API (unticking all leaves
+Username+Status, selections persist, corrupt file falls back to defaults
+without crashing).
