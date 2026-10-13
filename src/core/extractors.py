@@ -146,33 +146,55 @@ async def _extract(
             return result
         result["status"] = STATUS_PRIVATE if is_private_profile(body) else STATUS_ACTIVE
         result["stage"] = "profile_menu"
-        options = await _options(page, platform, page_ready_timeout_s)
-        if options is None:
-            await _failure(page, result, f"{label} profile menu not found")
-            return result
-        await _safe_click(options)
-        result["stage"] = "about_menu"
-        if debug_dump:
-            result["evidence_steps"].append(
-                await capture_page(page, platform, username, "profile_menu_open")
-            )
+        # Round 6, 2026-10-13 live evidence (docs/implementation/round6-menu-retry.md):
+        # a 12-account recheck showed the "More" menu and the About panel each
+        # sometimes render nothing at all even though the click itself
+        # succeeded (no exception) -- confirmed intermittent, not a selector
+        # bug (the exact same selectors succeeded on other accounts in the
+        # same run, and on this same account in an earlier run). One bounded
+        # retry of the whole menu-open -> About-click -> dialog-poll sequence
+        # before giving up; Instagram showed no evidence of this pattern in
+        # that run, but the retry applies to both for consistency and because
+        # retrying costs nothing extra when the first attempt already worked.
+        attempts = 2
+        parsed = {"date_joined": None, "join_badge": None, "country": None}
         texts = ABOUT_IG_TEXTS if platform == "ig" else ABOUT_THREADS_TEXTS
-        if not await _click_menu_item(page, texts, timeout_s=menu_click_timeout_s):
-            await _failure(page, result, f"{label} About option not found")
-            return result
-        if debug_dump:
-            result["evidence_steps"].append(
-                await capture_page(page, platform, username, "about_clicked")
+        for attempt in range(attempts):
+            options = await _options(page, platform, page_ready_timeout_s)
+            if options is None:
+                if attempt + 1 < attempts:
+                    await _dismiss(page)
+                    continue
+                await _failure(page, result, f"{label} profile menu not found")
+                return result
+            await _safe_click(options)
+            result["stage"] = "about_menu"
+            if debug_dump:
+                result["evidence_steps"].append(
+                    await capture_page(page, platform, username, f"profile_menu_open_{attempt + 1}")
+                )
+            if not await _click_menu_item(page, texts, timeout_s=menu_click_timeout_s):
+                if attempt + 1 < attempts:
+                    await _dismiss(page)
+                    continue
+                await _failure(page, result, f"{label} About option not found")
+                return result
+            if debug_dump:
+                result["evidence_steps"].append(
+                    await capture_page(page, platform, username, f"about_clicked_{attempt + 1}")
+                )
+            result["stage"] = "about_dialog"
+            selectors = ("div[role='dialog']",)
+            if platform == "threads":
+                selectors += ("div:has-text('Based in')", "div:has-text('Konum')")
+            parsed = await _poll_dialog(
+                page, selectors, max_chars=2000, dialog_timeout_s=dialog_timeout_s,
+                debug_sink=captured.append if debug_dump else None,
+                expected_username=username,
             )
-        result["stage"] = "about_dialog"
-        selectors = ("div[role='dialog']",)
-        if platform == "threads":
-            selectors += ("div:has-text('Based in')", "div:has-text('Konum')")
-        parsed = await _poll_dialog(
-            page, selectors, max_chars=2000, dialog_timeout_s=dialog_timeout_s,
-            debug_sink=captured.append if debug_dump else None,
-            expected_username=username,
-        )
+            if parsed["date_joined"] or parsed["country"] or attempt + 1 >= attempts:
+                break
+            await _dismiss(page)
         result.update(parsed)
         missing = [name for name in ("date_joined", "country") if not parsed[name]]
         if parsed["country"] and not country_is_disclosed(parsed["country"]):

@@ -265,3 +265,31 @@ captures) to find and fix two concrete causes behind the 24 Threads
 Fresh full suite after both fixes: **189 passed**, zero skips. Checkers 1/2/3/4
 were not opened; only checker_5 was used, and no new live run was started in
 this continuation beyond reading already-captured evidence from Codex's run.
+
+
+### Round 6 (Claude), 13 October 2026 - live confirmation batch and a new fix
+
+Huzaifah asked for a small controlled live batch to confirm P57/P58, with an
+explicit process: list errors, find root cause, plan, implement, document.
+
+**Confirmation batch 1** (12 targets, Combined, workers=5, checker_5,
+`debug/round6_confirm_targets.txt`): **63.1s total (~5.3s/target)**.
+
+| ID | State | Evidence and action |
+| --- | --- | --- |
+| P60 | Confirmed live | All 6 targets known from Round 5 to have Threads' real 404 text now correctly returned `NOT_FOUND` instead of a false identity error (lukehodges43, pa.yne432, ashly.92067, squirrel.708791, ne.wman5286, mo.rrison1007). P57 confirmed working live, not just by unit test. |
+| P61 | New failure pattern found / fixed, pending re-confirmation | 4 targets (charity_3810, ha.rdacre48, ke_nya6824, nolanesyg) returned Threads `about_dialog` with **both** date_joined and country missing this time (not country-only, so P58's fix correctly did not apply) -- raw evidence shows the About panel never rendered at all (`capture_page` "about_clicked" snapshot shows the plain profile page, no panel content). 2 more targets (thomasrussell1017, brenda_1074) failed with "About option not found" -- their *final-state* capture (taken after the full menu_click_timeout_s budget, since `result["stage"]` never advanced) shows the full menu **did** eventually render with "About this profile" visible, meaning the content arrived too late or the exact-text click raced it. Root cause: intermittent Threads menu/panel rendering latency, not a selector or parsing bug -- the identical selectors worked on other accounts in the same run and on these same accounts in Round 5's earlier run. Fix: one bounded retry of the whole menu-open -> About-click -> dialog-poll sequence in `_extract()` (`src/core/extractors.py`) when the first attempt returns neither date_joined nor country. New real-Chromium regression test: `test_threads_retries_once_when_menu_renders_empty_first_try`. [Report](implementation/round6-menu-retry.md). |
+
+**Confirmation batch 2** (the same 6 P61 accounts, Threads-only, workers=5,
+`debug/round6_retry_confirm_targets.txt`, run after the retry fix): **27.9s
+total (~4.65s/target)**. **All 6 succeeded on the first attempt** (no retry
+was even needed this time) -- 5 with `country_availability="not_disclosed"`
+(P58 confirmed live), 1 (`brenda_1074`) with the literal `"Not shared"` text
+(the pre-existing, already-correct handling). This suggests the earlier
+failures may be more related to 5-page concurrent Combined-mode load (IG and
+Threads running together across 5 pages) than to Threads alone under lighter
+load -- plausible, not proven; no controlled Combined-vs-Threads-only A/B
+test was run to confirm this specifically.
+
+Full suite after the retry fix: **190 passed**, zero skips. Checkers
+1/2/3/4 not opened in either confirmation batch.

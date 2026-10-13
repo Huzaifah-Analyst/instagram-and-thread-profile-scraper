@@ -183,6 +183,37 @@ def test_threads_about_with_no_country_row_is_complete_not_failed() -> None:
     run_browser(check)
 
 
+def test_threads_retries_once_when_menu_renders_empty_first_try() -> None:
+    """Round 6, 2026-10-13 live evidence: the first menu-open attempt sometimes
+    opens nothing (click succeeds, no items ever render), while a second
+    attempt on the same account succeeds normally. One bounded retry covers
+    this instead of failing on a single flaky attempt."""
+    async def check(page: Page) -> None:
+        """First click opens an empty menu; second click opens a real one with About."""
+        await page.route("**/*", lambda route: route.fulfill(content_type="text/html", body='''
+          <div role="main" style="padding-top:120px">
+            <h1>target</h1>
+            <div role="button" onclick="window.opens=(window.opens||0)+1;
+              document.getElementById('menu').style.display =
+              window.opens >= 2 ? 'block' : 'none'">
+              <svg title="More" width="24" height="24"><title>More</title></svg>
+            </div>
+            <div id="menu" style="display:none">
+              <span onclick="document.getElementById('about').style.display='block'">About this profile</span>
+            </div>
+            <div id="about" role="dialog" style="display:none">
+              Name<br>target (@target)<br>Joined<br>October 2025 &middot; 100M+
+            </div>
+          </div>'''))
+        result = await extract_threads(page, "target", page_ready_timeout_s=1,
+                                       dialog_timeout_s=.3, menu_click_timeout_s=.5)
+        assert result["date_joined"] == "October 2025"
+        assert result["stage"] == "complete"
+        assert result["evidence_steps"] == []  # debug_dump defaults off; no captures expected
+
+    run_browser(check)
+
+
 def test_detached_click_respects_total_deadline() -> None:
     """JS fallback must not inherit Playwright's 30-second lookup timeout."""
     from playwright.async_api import TimeoutError as BrowserTimeout
