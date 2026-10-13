@@ -84,3 +84,44 @@
 | **TSK-504** | Final client handover and 15-day free support warranty activation | Dev 1 & Dev 2 | `[ ]` | Client confirms receipt and approves delivery. |
 
 > **Status as of 2026-10-10 (`feature/sprint5-exe-packaging`):** TSK-501 built and actually ran (confirmed it stays open 30s+ without crashing), but its own acceptance criterion ("under 150 MB") was not met — measured 309.9 MB, over double the target, because Chromium alone is 432 MB on disk. Not checking this off; see `docs/memory.md`'s Sprint 5 entry for the full breakdown and what would have to change to get closer to 150 MB. TSK-502 not done (no clean Windows machine without Python in this environment); manual steps for Huzaifah are in that same memory.md entry. TSK-503 done (`docs/QUICK_START.md`), but written against Sprint 3 features that are not yet merged into `dev` — re-verify against the shipped build before handover. TSK-504 intentionally skipped (handover is between Huzaifah and the client, not this session).
+
+---
+
+## Remaining Work Backlog (as of 14 October 2026)
+
+Consolidated from Rounds 7 to 10. Branch `feature/output-selection-and-export`
+is 21 commits ahead of `dev` and carries everything below unless stated.
+
+### A. Blocks client handover
+
+| ID | Task | Why it matters | Status |
+| :--- | :--- | :--- | :---: |
+| **BL-01** | Rebuild `dist/MetaInspectorDesktop.exe` | The shipped exe is dated 10 Oct 14:56, before every 13 Oct fix: resource-blocker cache defect, Threads 404 wording, country-absent classification, menu retry, Select Output, CSV/Excel/History. Handing over the current file ships a known-broken build. | `[ ]` |
+| **BL-02** | TSK-502: run the exe on a clean Windows box with no Python | Never done. This is the client's actual environment. | `[ ]` |
+| **BL-03** | Merge the feature branch into `dev` | Huzaifah merges; this session does not self-merge. | `[ ]` |
+| **BL-04** | Move `docs/accounts.txt` out of the repo folder | Plaintext checker passwords and TOTP secrets. Gitignored and never committed, but the folder itself may be handed over. | `[ ]` |
+| **BL-05** | Re-verify `docs/QUICK_START.md` against the shipped build | Written against Sprint 3 features that were unmerged at the time. | `[ ]` |
+
+### B. Speed and feature work
+
+| ID | Task | Why it matters | Status |
+| :--- | :--- | :--- | :---: |
+| **SP-01** | Conditional Threads: skip the Threads About panel when Instagram already returned a country | Measured saving ~164s to ~176s off a 95-account run, with no loss of country coverage. See `implementation/round10-timing-investigation.md`. Must be a selectable mode, because it drops Threads Joined and Threads Badge for skipped accounts. | `[ ]` |
+| **SP-02** | `IG Status Only` mode with no login at all | Measured 119.4s for 100 targets logged out, against 7 to 10 minutes for the logged-in path. Needs a longer render wait than the prototype used: 14 of 100 pages were still blank at 1.2s. | `[ ]` |
+| **SP-03** | Rename the GUI's `Checker limit` control | It is bound to `workers`, not to the number of checker accounts. The label misdescribes what it does. | `[ ]` |
+
+### C. Documents that contradict the build
+
+| ID | Task | Status |
+| :--- | :--- | :---: |
+| **DC-01** | `PRD.md` NFR-1 still says 4 to 5 minutes. Client has accepted 6 to 7. Record the accepted figure and the measured afternoon/night spread. | `[ ]` |
+| **DC-02** | `PRD.md` section 5 lists programmatic 2FA as out of scope, but TOTP auto-login is implemented. | `[ ]` |
+| **DC-03** | TSK-301 to 305, 401 to 404, 501 and 503 are still unticked above although the work exists. | `[ ]` |
+| **DC-04** | NFR-3 asks for an exe under 150 MB; the build is 309.9 MB because Chromium alone is 432 MB on disk. State this as a known deviation. | `[ ]` |
+
+### D. Open, probably not code-fixable
+
+| ID | Task | Status |
+| :--- | :--- | :---: |
+| **OP-01** | P64: `lyricnixon292`'s Threads profile is live but completely empty, and Threads renders no About control for it. 1 failure in 149 platform checks. | `[ ]` |
+| **OP-02** | Three checker accounts are suspended; only `checker_5` is in use. Replacements needed before multi-checker concurrency is meaningful. | `[ ]` |
