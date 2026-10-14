@@ -28,9 +28,7 @@ from playwright.async_api import BrowserContext, Page
 from src.core.ban_engine import (
     COMPOSITE_BLOCKED,
     STATUS_ERROR,
-    STATUS_NOT_FOUND,
     STATUS_SESSION_BLOCKED,
-    BanLinkEngine,
 )
 from src.core.extractors import (
     DIALOG_TIMEOUT_S,
@@ -47,13 +45,13 @@ from src.core.paths import DEFAULT_PROFILE_DIR
 from src.core.validation import clean_usernames, positive_seconds
 from src.core.about_parser import country_is_disclosed
 
+from src.core.modes import (
+    MODE_IG_ONLY, MODE_THREADS_ONLY, MODE_COMBINED, MODE_COMBINED_SMART,
+    MODE_IG_STATUS_ONLY, MODES,
+)
+from src.core.result_records import build_record
+
 logger = logging.getLogger(__name__)
-
-MODE_IG_ONLY = "ig_only"
-MODE_THREADS_ONLY = "threads_only"
-MODE_COMBINED = "combined"
-MODES = (MODE_IG_ONLY, MODE_THREADS_ONLY, MODE_COMBINED)
-
 
 DEFAULT_WORKERS = 5
 VIEWPORT = {"width": 1280, "height": 800}  # Threads menu detection assumes this width.
@@ -91,56 +89,6 @@ def empty_platform_result() -> dict:
     return {"status": None, "date_joined": None, "join_badge": None, "country": None, "error": None}
 
 
-def build_record(
-    username: str, ig: dict, threads: dict, seconds: float, mode: Optional[str] = None,
-) -> dict:
-    """Merges both platform results into one record (matches ``run_items`` schema).
-
-    Args:
-        username: Account username.
-        ig: Instagram extractor result (or ``empty_platform_result()``).
-        threads: Threads extractor result (or ``empty_platform_result()``).
-        seconds: Total time spent on this account.
-
-    Returns:
-        Flat result record.
-    """
-    verdict = BanLinkEngine.evaluate(ig["status"], threads["status"])
-    errors = [e for e in (ig.get("error"), threads.get("error")) if e]
-    checked = [platform for platform in (ig, threads) if platform.get("status") is not None]
-    complete = all(country_is_disclosed(platform.get("country")) and platform.get("date_joined") for platform in checked)
-    if mode == MODE_COMBINED and len(checked) != 2:
-        complete = False
-    any_data = any(country_is_disclosed(platform.get("country")) or platform.get("date_joined") for platform in checked)
-    quality = "Complete" if complete and checked and not errors else ("Partial" if any_data else "Failed")
-    if checked and all(platform["status"] == STATUS_NOT_FOUND for platform in checked):
-        quality = "Not available"
-    return {
-        "username": username,
-        "composite_status": verdict["composite_status"],
-        "ig_status": verdict["ig_status"],
-        "ig_country": ig.get("country"),
-        "ig_date_joined": ig.get("date_joined"),
-        "threads_status": verdict["threads_status"],
-        "threads_country": threads.get("country"),
-        "threads_date_joined": threads.get("date_joined"),
-        "threads_badge": threads.get("join_badge"),
-        "seconds": round(seconds, 2),
-        "error_message": "; ".join(errors) or None,
-        "data_quality": quality,
-        "ig_stage": ig.get("stage"),
-        "threads_stage": threads.get("stage"),
-        "ig_source_url": ig.get("source_url"),
-        "threads_source_url": threads.get("source_url"),
-        "ig_evidence": ig.get("evidence"),
-        "threads_evidence": threads.get("evidence"),
-        "ig_evidence_steps": ig.get("evidence_steps", []),
-        "threads_evidence_steps": threads.get("evidence_steps", []),
-        "ig_country_availability": ig.get("country_availability"),
-        "threads_country_availability": threads.get("country_availability"),
-    }
-
-
 class MultiWorkerScraper:
     """Checks targets on parallel pages allocated across verified checker logins."""
 
@@ -166,7 +114,7 @@ class MultiWorkerScraper:
         Args:
             profile_dir: Chromium user-data dir holding the checker login session.
             workers: Number of concurrent worker pages (1 to 5).
-            mode: ``ig_only``, ``threads_only`` or ``combined``.
+            mode: One of MODES; Combined remains the default.
             headless: Run Chromium without a visible window.
             min_delay: Minimum pause between accounts on one worker (seconds).
             max_delay: Maximum pause between accounts on one worker (seconds).
@@ -197,7 +145,9 @@ class MultiWorkerScraper:
         for budget in (page_ready_timeout_s, dialog_timeout_s, menu_click_timeout_s):
             positive_seconds(budget)
         self.checkers = checkers if checkers is not None else [Checker("checker_1", Path(profile_dir), True)]
-        if not self.checkers or len(self.checkers) > 5:
+        if mode == MODE_IG_STATUS_ONLY:
+            self.checkers = []
+        if mode != MODE_IG_STATUS_ONLY and (not self.checkers or len(self.checkers) > 5):
             raise ValueError("Select between 1 and 5 checkers.")
         paths = {str(checker.profile_dir.resolve()).casefold() for checker in self.checkers}
         if len(paths) != len(self.checkers):
@@ -289,7 +239,12 @@ class MultiWorkerScraper:
                 "dialog_timeout_s": self.dialog_timeout_s,
                 "menu_timeout_s": self.menu_click_timeout_s,
             })
-        records = await run_pool(self, users)
+        if self.mode == MODE_IG_STATUS_ONLY:
+            from src.core.anonymous_status import run_anonymous
+
+            records = await run_anonymous(self, users)
+        else:
+            records = await run_pool(self, users)
         processed = {record["username"] for record in records}
         self.unstarted_usernames = [user for user in users if user not in processed]
         if self.journal is not None:
@@ -332,6 +287,10 @@ class MultiWorkerScraper:
 
     async def _check_account(self, page: Page, username: str) -> dict:
         """Runs the extractors required by the current mode for one account."""
+        if self.mode == MODE_IG_STATUS_ONLY:
+            from src.core.anonymous_status import check_status
+
+            return await check_status(page, username, self.page_ready_timeout_s)
         t0 = time.monotonic()
         ig = empty_platform_result()
         threads = empty_platform_result()
@@ -347,6 +306,12 @@ class MultiWorkerScraper:
                 continue
             if self.is_stopped or ig["status"] == STATUS_SESSION_BLOCKED:
                 break
+            if (platform == "threads" and self.mode == MODE_COMBINED_SMART
+                    and country_is_disclosed(ig.get("country"))):
+                threads = {**empty_platform_result(), "status": "skipped_ig_sufficient",
+                           "stage": "skipped",
+                           "error": "Threads skipped: Instagram already returned a country"}
+                continue
             try:
                 result = await extract(page, username, **timeout_kwargs)
             except Exception as exc:
@@ -427,6 +392,8 @@ def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
+    if args.mode == MODE_IG_STATUS_ONLY and (args.login or args.login_checker):
+        parser.error("ig_status_only uses no login; omit --login and --login-checker")
     if args.login or args.login_checker:
         slot = CheckerStore(args.profile).load()[(args.login_checker or 1) - 1]
         print(asyncio.run(login_session(slot.profile_dir, expected_username=slot.username)))
@@ -438,9 +405,9 @@ def main() -> None:
     if not names:
         parser.error("give usernames or --file")
 
-    slots = CheckerStore(args.profile).load()
+    slots = [] if args.mode == MODE_IG_STATUS_ONLY else CheckerStore(args.profile).load()
     selected = [slot for slot in slots if slot.enabled]
-    if args.checkers:
+    if args.checkers and args.mode != MODE_IG_STATUS_ONLY:
         numbers = args.checkers.split(",")
         if not numbers or any(n not in {"1", "2", "3", "4", "5"} for n in numbers) or len(set(numbers)) != len(numbers):
             parser.error("--checkers must list distinct slots from 1 to 5")

@@ -47,6 +47,15 @@ def _error_cell(error_message: object) -> str:
     return text
 
 
+def metadata_cell(record: dict, field: str) -> str:
+    """Explain unrequested fields without fabricating underlying record values."""
+    if record.get("checking_mode") == "ig_status_only":
+        return "Unavailable (status only)" if field.startswith("ig_") else "Not checked"
+    if field.startswith("threads_") and record.get("threads_status") == "skipped_ig_sufficient":
+        return "Skipped (IG country)"
+    return theme.cell(record.get(field))
+
+
 def record_to_row(position: int, record: dict) -> tuple[str, ...]:
     """Converts a scraper record into table cell strings.
 
@@ -57,7 +66,7 @@ def record_to_row(position: int, record: dict) -> tuple[str, ...]:
     Returns:
         Cell values in ``COLUMNS`` order.
     """
-    joined = theme.cell(record.get("threads_date_joined"))
+    joined = metadata_cell(record, "threads_date_joined")
     if record.get("threads_badge"):
         joined = f"{joined} · {record['threads_badge']}"
     return (
@@ -65,10 +74,10 @@ def record_to_row(position: int, record: dict) -> tuple[str, ...]:
         f"@{record.get('username', '')}",
         theme.display_status(record),
         str(record.get("data_quality", "Unknown")),
-        str(record.get("checker_id", "")),
-        theme.cell(record.get("ig_country")),
-        theme.cell(record.get("ig_date_joined")),
-        theme.cell(record.get("threads_country")),
+        str(record.get("checker_id") or ""),
+        metadata_cell(record, "ig_country"),
+        metadata_cell(record, "ig_date_joined"),
+        metadata_cell(record, "threads_country"),
         joined,
         f"{float(record.get('seconds') or 0):.1f}s",
         _error_cell(record.get("error_message")),
@@ -132,7 +141,7 @@ class DataTable(ctk.CTkFrame):
         self.records.append(record)
         values = record_to_row(len(self.records), record)
         status = values[2]
-        tag = "INCOMPLETE" if status == "ACTIVE" and record.get("data_quality") != "Complete" else status
+        tag = "INCOMPLETE" if status == "ACTIVE" and record.get("data_quality") not in ("Complete", "Status only") else status
         item = self.tree.insert("", "end", values=values, tags=(tag,))
         self.tree.see(item)
         self._counts[status] = self._counts.get(status, 0) + 1

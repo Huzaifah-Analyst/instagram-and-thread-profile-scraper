@@ -140,3 +140,14 @@
 | 2026-10-13 | feature/output-selection-and-export (Claude, Round 9) | verification | Independent re-run of Codex's full suite | N/A | 0 live | 222 passed in 107.83s, zero skips | Pass: matches Codex's reported count | pytest output in session |
 | 2026-10-13 | feature/output-selection-and-export (Claude, Round 9) | benchmark | **IG-only clean re-run**, 100 unique targets, after confirming network stable (ping 0% loss) | 5 | 100 | **426.1s**; 93 complete, 7 genuine NOT_FOUND, **0 extraction failures**; 86 real IG countries, 93 dates | **NFR-1 (300s) NOT MET**; invalidates Round 8's 584.6s/41-failure figure (network outage) | [Report](implementation/round9-ig-only-clean-rerun.md), [output](../debug/round9_ig100_clean.txt) |
 | 2026-10-13 | feature/output-selection-and-export (Claude, Round 9) | verification | Output settings behaviour against the real API | N/A | 0 live | Untick-all leaves (Username, Status); custom selection persists across reload; corrupt JSON falls back to defaults with a logged reason, no crash | Pass: matches the directive's requirements | session output |
+
+
+## Targeted check modes (14 October 2026)
+
+- Branch `feature/targeted-check-modes`, base `f07fc72`.
+- Baseline: 222 passed in 64.32s.
+- Initial new tests: 34 passed, 1 failed in 7.31s; second Tk root could not load local ttk/scale.tcl. Changed new GUI tests to the existing single-interpreter module fixture pattern; no skipped or weakened coverage.
+- Corrected new tests: 35 passed in 4.86s.
+- Final complete suite, including further CLI login-flag and analyzer regressions: 260 passed in 53.71s, zero skips.
+- Real Chromium synthetic page is blank until 1.5 seconds, then classified Active by polling. Ambiguous markerless page remains Unknown at a bounded deadline. These are correctness fixtures, not live speed benchmarks.
+- No live runs performed, no checker profiles opened, no 100-target time or Smart Combined saving measured. Raw test outputs: implementation/evidence/targeted-modes-*.txt.

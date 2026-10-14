@@ -37,7 +37,9 @@ def run_to_row(run: dict) -> tuple[str, ...]:
     return (
         str(run["created_at"]),
         {"combined": "Combined", "ig_only": "Instagram Only",
-         "threads_only": "Threads Only"}.get(run["mode"], str(run["mode"])),
+         "threads_only": "Threads Only",
+         "combined_smart": "Smart Combined",
+         "ig_status_only": "IG Status Only"}.get(run["mode"], str(run["mode"])),
         str(run["total_accounts"]),
         str(run["active_count"]),
         str(run["banned_count"]),

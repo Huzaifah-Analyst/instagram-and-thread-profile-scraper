@@ -1,0 +1,75 @@
+.................................F.                                      [100%]
+================================== FAILURES ===================================
+____________ test_gui_forwards_new_mode_unchanged[ig_status_only] _____________
+
+tmp_path = WindowsPath('C:/Users/huzai/Downloads/alizakhan/.pytest-local-temp-targeted-new/test_gui_forwards_new_mode_unc1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001ED074FAFF0>
+mode = 'ig_status_only'
+
+    @pytest.mark.parametrize("mode", ["combined_smart", "ig_status_only"])
+    def test_gui_forwards_new_mode_unchanged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                           mode: str) -> None:
+        """Actual radios feed Start and the production factory without new defaults."""
+>       app = MetaInspectorApp(profile_dir=tmp_path / "profile")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_targeted_modes_gui.py:17:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\gui\app.py:47: in __init__
+    super().__init__(fg_color=theme.BG_DARK)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\customtkinter\windows\ctk_tk.py:40: in __init__
+    CTK_PARENT_CLASS.__init__(self, **pop_from_dict_by_set(kwargs, self._valid_tk_constructor_arguments))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <src.gui.app.MetaInspectorApp object .>, screenName = None
+baseName = '__main__', className = 'Tk', useTk = True, sync = False, use = None
+
+    def __init__(self, screenName=None, baseName=None, className='Tk',
+                 useTk=True, sync=False, use=None):
+        """Return a new top level widget on screen SCREENNAME. A new Tcl interpreter will
+        be created. BASENAME will be used for the identification of the profile file (see
+        readprofile).
+        It is constructed from sys.argv[0] without extensions if None is given. CLASSNAME
+        is the name of the widget class."""
+        self.master = None
+        self.children = {}
+        self._tkloaded = False
+        # to avoid recursions in the getattr code in case of failure, we
+        # ensure that self.tk is always _something_.
+        self.tk = None
+        if baseName is None:
+            import os
+            baseName = os.path.basename(sys.argv[0])
+            baseName, ext = os.path.splitext(baseName)
+            if ext not in ('.py', '.pyc'):
+                baseName = baseName + ext
+        interactive = False
+>       self.tk = _tkinter.create(screenName, baseName, className, interactive, wantobjects, useTk, sync, use)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       _tkinter.TclError: Can't find a usable tk.tcl in the following directories:
+E           C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tcl8.6/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/lib/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/lib/tk8.6 C:/Users/huzai/AppData/Local/Programs/lib/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/library
+E
+E       C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/tk.tcl: couldn't read file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/ttk/scale.tcl": no such file or directory
+E       couldn't read file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/ttk/scale.tcl": no such file or directory
+E           while executing
+E       "source -encoding utf-8 [file join $::ttk::library scale.tcl]"
+E           (file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/ttk/ttk.tcl" line 118)
+E           invoked from within
+E       "source -encoding utf-8 C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/ttk/ttk.tcl"
+E           ("uplevel" body line 1)
+E           invoked from within
+E       "uplevel \#0 [list source -encoding utf-8 $::ttk::library/ttk.tcl]"
+E           (file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/tk.tcl" line 702)
+E           invoked from within
+E       "source -encoding utf-8 C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/tk.tcl"
+E           ("uplevel" body line 1)
+E           invoked from within
+E       "uplevel #0 [list source -encoding utf-8 $file]"
+E
+E
+E       This probably means that tk wasn't installed properly.
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\tkinter\__init__.py:2346: TclError
+=========================== short test summary info ===========================
+FAILED tests/test_targeted_modes_gui.py::test_gui_forwards_new_mode_unchanged[ig_status_only]
+1 failed, 34 passed in 7.31s

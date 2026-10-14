@@ -106,9 +106,9 @@ is 21 commits ahead of `dev` and carries everything below unless stated.
 
 | ID | Task | Why it matters | Status |
 | :--- | :--- | :--- | :---: |
-| **SP-01** | Conditional Threads: skip the Threads About panel when Instagram already returned a country | Measured saving ~164s to ~176s off a 95-account run, with no loss of country coverage. See `implementation/round10-timing-investigation.md`. Must be a selectable mode, because it drops Threads Joined and Threads Badge for skipped accounts. | `[ ]` |
-| **SP-02** | `IG Status Only` mode with no login at all | Measured 119.4s for 100 targets logged out, against 7 to 10 minutes for the logged-in path. Needs a longer render wait than the prototype used: 14 of 100 pages were still blank at 1.2s. | `[ ]` |
-| **SP-03** | Rename the GUI's `Checker limit` control | It is bound to `workers`, not to the number of checker accounts. The label misdescribes what it does. | `[ ]` |
+| **SP-01** | Conditional Threads when Instagram provides a real country | Implemented as combined_smart; saved-record saving is a projection, not a live measurement of the new mode. See implementation/sp01-smart-combined.md. | `[x]` |
+| **SP-02** | IG Status Only without login | Fresh anonymous context, bounded marker polling, no account pacing, explicit unavailable fields. Live performance remains unmeasured. See implementation/sp02-anonymous-status.md. | `[x]` |
+| **SP-03** | Rename worker control to Parallel workers | Label corrected; same workers variable and value. Real Tk coverage passes. | `[x]` |
 
 ### C. Documents that contradict the build
 

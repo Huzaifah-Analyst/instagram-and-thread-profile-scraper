@@ -12,6 +12,7 @@ from typing import Callable, Optional
 import customtkinter as ctk
 
 from src.core.scraper import MODE_COMBINED, MODE_IG_ONLY, MultiWorkerScraper, login_session
+from src.core.modes import MODE_IG_STATUS_ONLY, MODE_COMBINED_SMART, STATUS_ONLY_NOTICE
 from src.core.session import SESSION_CONNECTED, check_session
 from src.core.checkers import Checker, CheckerStore
 from src.core.credentials import AccountCredential
@@ -66,7 +67,7 @@ class MetaInspectorApp(ctk.CTk):
 
         self._build_header()
         self.left_panel = LeftPanel(self, on_start=self._on_start, on_pause_toggle=self._on_pause_toggle,
-                                    on_stop=self._on_stop)
+                                    on_stop=self._on_stop, on_mode_changed=self._on_mode_changed)
         self.left_panel.grid(row=1, column=0, sticky="nsw")
         self.table = DataTable(self)
         self.table.grid(row=1, column=1, sticky="nsew", padx=14, pady=14)
@@ -109,13 +110,25 @@ class MetaInspectorApp(ctk.CTk):
             dialog_timeout_s=self.left_panel.dialog_timeout_s,
             menu_click_timeout_s=self.left_panel.menu_click_timeout_s,
             debug_dump=self.left_panel.debug_dump, progress_callback=callback,
-            checkers=[slot for slot in self.checker_store.load() if slot.enabled],
+            checkers=([] if mode == MODE_IG_STATUS_ONLY else
+                      [slot for slot in self.checker_store.load() if slot.enabled]),
             persist_results=True,
         )
 
     # ------------------------------------------------------------------ #
     # Controls
     # ------------------------------------------------------------------ #
+
+    def _on_mode_changed(self) -> None:
+        """Explain intentional scope limitations before a run starts."""
+        if self.left_panel.mode == MODE_IG_STATUS_ONLY:
+            self.status_bar.message(STATUS_ONLY_NOTICE)
+        elif self.left_panel.mode == MODE_COMBINED_SMART:
+            self.status_bar.message("Threads is skipped when Instagram supplies a country.")
+        else:
+            self.status_bar.message("Ready. Paste usernames and press Start.")
+        self._refresh_session()
+        self._apply_state()
 
     def _on_start(self) -> None:
         """Validates input and starts a run."""
@@ -140,7 +153,10 @@ class MetaInspectorApp(ctk.CTk):
         except (OSError, ValueError) as exc:
             self.status_bar.message(str(exc), "error")
             return
-        self.status_bar.message("Verifying selected checker logins, then checking targets...")
+        self.status_bar.message(
+            STATUS_ONLY_NOTICE if mode == MODE_IG_STATUS_ONLY else
+            "Verifying selected checker logins, then checking targets..."
+        )
         self._apply_state()
 
     def _on_pause_toggle(self) -> None:
@@ -333,12 +349,17 @@ class MetaInspectorApp(ctk.CTk):
         """Syncs button states with the bridge and login status."""
         login = self._login_running
         self.left_panel.apply_state(self.bridge.state, start_allowed=not login)
-        busy = login or self.bridge.state is not RunState.IDLE
+        busy = (login or self.bridge.state is not RunState.IDLE
+                or self.left_panel.mode == MODE_IG_STATUS_ONLY)
         self.setup_button.configure(state="disabled" if busy else "normal")
         self.manage_button.configure(state="disabled" if busy else "normal")
 
     def _refresh_session(self) -> None:
         """Show saved-login presence honestly; only preflight verifies live health."""
+        if self.left_panel.mode == MODE_IG_STATUS_ONLY:
+            self._session_label.configure(text="Anonymous status checks: no login needed",
+                                          text_color=theme.TEXT_MUTED)
+            return
         try:
             selected = [slot for slot in self.checker_store.load() if slot.enabled]
             saved = sum(check_session(slot.profile_dir)[0] == SESSION_CONNECTED for slot in selected)

@@ -55,8 +55,10 @@ def field_state(row: dict, field: str, platform: str) -> str:
     status = row.get(f"{platform}_status")
     if status == "not_found":
         return "account-does-not-exist"
-    if status in (None, "skipped"):
+    if status in (None, "skipped", "skipped_ig_sufficient"):
         return "not-checked"
+    if row.get("checking_mode") == "ig_status_only":
+        return "unavailable-in-mode"
     if country and (row.get(f"{platform}_country_availability") in ("not_shared", "not_disclosed")
                     or (value and str(value).strip().casefold() == "not shared")):
         return "platform-withheld"

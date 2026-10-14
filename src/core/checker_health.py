@@ -59,7 +59,7 @@ async def verify_context(
 ) -> dict[str, str | None]:
     """Check every requested platform before assigning any targets to a checker."""
     page = context.pages[0] if context.pages else await context.new_page()
-    platforms = ("ig", "threads") if mode == "combined" else (("ig",) if mode == "ig_only" else ("threads",))
+    platforms = ("ig", "threads") if mode in ("combined", "combined_smart") else (("ig",) if mode == "ig_only" else ("threads",))
     results: dict[str, str | None] = {}
     for platform in platforms:
         try:

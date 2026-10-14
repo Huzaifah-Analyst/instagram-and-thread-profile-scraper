@@ -73,7 +73,7 @@ class BanLinkEngine:
                 "threads_status": STATUS_BANNED,
             }
 
-        checked = [s for s in (ig, threads) if s != STATUS_SKIPPED]
+        checked = [s for s in (ig, threads) if s not in (STATUS_SKIPPED, "skipped_ig_sufficient")]
 
         if checked and all(s == STATUS_NOT_FOUND for s in checked):
             return {"composite_status": COMPOSITE_NOT_FOUND, "ig_status": ig, "threads_status": threads}

@@ -153,4 +153,4 @@ def has_username(text: str, username: str) -> bool:
 
 def country_is_disclosed(value: Optional[str]) -> bool:
     """Separate the live-observed 'Not shared' disclosure from a country value."""
-    return bool(value and value.strip().casefold() != "not shared")
+    return bool(value and value.strip() and value.strip().casefold() != "not shared")

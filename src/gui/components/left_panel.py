@@ -10,7 +10,11 @@ from typing import Callable
 import customtkinter as ctk
 
 from src.core.extractors import DIALOG_TIMEOUT_S, MENU_CLICK_TIMEOUT_S
-from src.core.scraper import DEFAULT_WORKERS, MODE_COMBINED, MODE_IG_ONLY, MODE_THREADS_ONLY, clean_usernames
+from src.core.scraper import DEFAULT_WORKERS, clean_usernames
+from src.core.modes import (
+    MODE_COMBINED, MODE_IG_ONLY, MODE_THREADS_ONLY,
+    MODE_COMBINED_SMART, MODE_IG_STATUS_ONLY,
+)
 from src.gui import theme
 from src.gui.bridge import RunState
 from src.core.validation import positive_seconds
@@ -21,6 +25,8 @@ MODE_LABELS = (
     (MODE_COMBINED, "Combined (IG + Threads)"),
     (MODE_IG_ONLY, "Instagram Only"),
     (MODE_THREADS_ONLY, "Threads Only"),
+    (MODE_COMBINED_SMART, "Smart Combined (skip Threads when IG gives country)"),
+    (MODE_IG_STATUS_ONLY, "IG Status Only (no login, fastest)"),
 )
 WORKER_CHOICES = ("1", "2", "3", "4", "5")
 
@@ -34,6 +40,7 @@ class LeftPanel(ctk.CTkFrame):
         on_start: Callable[[], None],
         on_pause_toggle: Callable[[], None],
         on_stop: Callable[[], None],
+        on_mode_changed: Callable[[], None] | None = None,
     ) -> None:
         """Builds the panel.
 
@@ -72,16 +79,27 @@ class LeftPanel(ctk.CTkFrame):
                      text_color=theme.TEXT_PRIMARY).grid(row=3, column=0, sticky="w", padx=16, pady=(0, 6))
         self.mode_var = ctk.StringVar(value=MODE_COMBINED)
         self._mode_buttons: list[ctk.CTkRadioButton] = []
-        for row, (value, label) in enumerate(MODE_LABELS, start=4):
-            button = ctk.CTkRadioButton(self, text=label, value=value, variable=self.mode_var,
-                                        font=theme.FONT_BODY, text_color=theme.TEXT_PRIMARY,
-                                        fg_color=theme.ACCENT_BLUE, hover_color=theme.ACCENT_HOVER)
-            button.grid(row=row, column=0, sticky="w", padx=20, pady=3)
+        mode_frame = ctk.CTkScrollableFrame(self, height=155, fg_color="transparent")
+        mode_frame.grid(row=4, column=0, rowspan=3, sticky="ew", padx=12)
+        self._mode_labels: list[ctk.CTkLabel] = []
+        for row, (value, label) in enumerate(MODE_LABELS):
+            button = ctk.CTkRadioButton(
+                mode_frame, text="", value=value, variable=self.mode_var, width=28,
+                command=on_mode_changed, fg_color=theme.ACCENT_BLUE,
+            )
+            button.grid(row=row, column=0, sticky="nw", pady=4)
+            caption = ctk.CTkLabel(
+                mode_frame, text=label, font=theme.FONT_BODY, wraplength=225,
+                justify="left", anchor="w",
+            )
+            caption.grid(row=row, column=1, sticky="w", padx=4, pady=2)
+            caption.bind("<Button-1>", lambda _event, control=button: control.invoke())
             self._mode_buttons.append(button)
+            self._mode_labels.append(caption)
 
         workers_row = ctk.CTkFrame(self, fg_color="transparent")
         workers_row.grid(row=7, column=0, sticky="ew", padx=16, pady=(12, 0))
-        ctk.CTkLabel(workers_row, text="Checker limit", font=theme.FONT_SECTION,
+        ctk.CTkLabel(workers_row, text="Parallel workers", font=theme.FONT_SECTION,
                      text_color=theme.TEXT_PRIMARY).pack(side="left")
         self.workers_var = ctk.StringVar(value=str(DEFAULT_WORKERS))
         self.workers_menu = ctk.CTkOptionMenu(workers_row, values=list(WORKER_CHOICES),
