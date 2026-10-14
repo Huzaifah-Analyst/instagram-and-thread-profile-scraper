@@ -4,7 +4,7 @@ from typing import Optional
 
 from src.core.about_parser import country_is_disclosed
 from src.core.ban_engine import BanLinkEngine, STATUS_NOT_FOUND
-from src.core.modes import MODE_COMBINED, MODE_IG_STATUS_ONLY
+from src.core.modes import MODE_COMBINED, MODE_COMBINED_SMART, MODE_IG_STATUS_ONLY
 
 
 def build_record(
@@ -23,12 +23,17 @@ def build_record(
     """
     verdict = BanLinkEngine.evaluate(ig["status"], threads["status"])
     errors = [e for e in (ig.get("error"), threads.get("error")) if e]
-    checked = [platform for platform in (ig, threads) if platform.get("status") is not None]
+    smart_skip = (
+        mode == MODE_COMBINED_SMART
+        and threads.get("status") == "skipped_ig_sufficient"
+    )
+    requested = (ig,) if smart_skip else (ig, threads)
+    checked = [platform for platform in requested if platform.get("status") is not None]
     complete = all(
         country_is_disclosed(platform.get("country")) and platform.get("date_joined")
         for platform in checked
     )
-    if mode == MODE_COMBINED and len(checked) != 2:
+    if mode in (MODE_COMBINED, MODE_COMBINED_SMART) and not smart_skip and len(checked) != 2:
         complete = False
     any_data = any(
         country_is_disclosed(platform.get("country")) or platform.get("date_joined")

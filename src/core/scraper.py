@@ -309,8 +309,7 @@ class MultiWorkerScraper:
             if (platform == "threads" and self.mode == MODE_COMBINED_SMART
                     and country_is_disclosed(ig.get("country"))):
                 threads = {**empty_platform_result(), "status": "skipped_ig_sufficient",
-                           "stage": "skipped",
-                           "error": "Threads skipped: Instagram already returned a country"}
+                           "stage": "skipped"}
                 continue
             try:
                 result = await extract(page, username, **timeout_kwargs)

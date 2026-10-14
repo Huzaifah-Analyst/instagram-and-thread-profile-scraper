@@ -33,6 +33,11 @@ was not checked. IG suspension remains an IG observation, with no fabricated
 Threads ban. Recognized status results have `data_quality="Status only"`;
 an inconclusive status has `data_quality="Unknown"`.
 
+The [review fixes](round12-review-fixes.md) keep `error_message` empty for
+recognized statuses. Unknown/read failures retain a real reason. Follower
+counts accept both singular and plural; bare labels and following counts
+still do not establish an active profile.
+
 The GUI shows the mode limitation before Start, replaces the checker header
 with "no login needed", and disables login setup controls while this mode is
 selected. The table displays "Unavailable (status only)" for IG country/date

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Page, async_playwright
 
-from src.core.modes import MODE_IG_STATUS_ONLY, STATUS_ONLY_NOTICE
+from src.core.modes import MODE_IG_STATUS_ONLY
 from src.core.result_records import build_record
 
 if TYPE_CHECKING:
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 _COUNT = r"\d[\d,.]*(?:\s?[kmb])?"
 _FOLLOWERS = re.compile(
-    rf"\b{_COUNT}\s+followers\b|\bfollowers\s*:?\s*{_COUNT}\b",
+    rf"\b{_COUNT}\s+followers?\b|\bfollowers?\s*:?\s*{_COUNT}\b",
     re.IGNORECASE,
 )
 
@@ -68,9 +68,10 @@ async def check_status(page: Page, username: str, timeout_s: float) -> dict:
 def status_record(username: str, status: str, reason: str,
                   seconds: float, source: str | None = None) -> dict:
     """Keep unavailable metadata empty and distinguish scope from failure."""
+    error = (reason or "Status could not be determined.") if status in ("unknown", "error") else None
     ig = {"status": status, "country": None, "date_joined": None,
           "stage": "status_only", "country_availability": "unavailable_in_mode",
-          "source_url": source, "error": " ".join(filter(None, (STATUS_ONLY_NOTICE, reason)))}
+          "source_url": source, "error": error}
     threads = {"status": None, "country": None, "date_joined": None,
                "stage": "skipped", "country_availability": "unavailable_in_mode"}
     record = build_record(username, ig, threads, seconds, MODE_IG_STATUS_ONLY)

@@ -20,9 +20,10 @@ the run as before.
 
 A deliberate skip records `threads_status="skipped_ig_sufficient"`,
 `threads_stage="skipped"`, and None for all Threads country/date/badge values.
-The reason is "Threads skipped: Instagram already returned a country".
-The row is Partial rather than Failed, reflecting intentionally uncollected
-Threads metadata. The table explains the skipped cells, and the offline
+After the [review fixes](round12-review-fixes.md), the skip reason stays in
+the status, stage and table cells; it does not populate the error channel.
+A skipped row with a real IG country and joined date is Complete unless
+there is a genuine error. The table explains the skipped cells, and the offline
 analyzer counts them as not checked. No IG value is copied into Threads.
 
 Moved record construction to `core/result_records.py`, retaining its import

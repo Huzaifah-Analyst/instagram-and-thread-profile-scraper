@@ -35,8 +35,8 @@ def test_smart_uses_disclosed_country_only(country: str | None, skipped: bool,
         threads.assert_not_awaited()
         assert record["threads_status"] == "skipped_ig_sufficient"
         assert record["threads_stage"] == "skipped"
-        assert record["data_quality"] != "Failed"
-        assert "Threads skipped: Instagram already returned a country" in record["error_message"]
+        assert record["data_quality"] == "Complete"
+        assert record["error_message"] is None
         assert all(record[field] is None for field in (
             "threads_country", "threads_date_joined", "threads_badge",
         ))
@@ -84,6 +84,9 @@ def test_smart_preflight_requires_both_platforms(monkeypatch: pytest.MonkeyPatch
     ("Account suspended", "suspended"),
     ("1,234 followers", "active"), ("12.4K Followers", "active"),
     ("Followers\n0", "active"),
+    ("1 follower", "active"), ("1 Follower", "active"),
+    ("0 followers", "active"), ("1 following", "unknown"),
+    ("Log In Sign Up willie 1 follower 3 following", "active"),
     ("", "unknown"), ("Log in to see more", "unknown"),
     ("Instagram profile Follow", "unknown"), ("followers", "unknown"),
     ("123 following", "unknown"),
@@ -105,7 +108,10 @@ def test_status_records_keep_unavailable_fields_empty(status: str) -> None:
     for field in ("ig_country", "ig_date_joined", "threads_country",
                   "threads_date_joined", "threads_badge"):
         assert record[field] is None
-    assert "unavailable without login" in record["error_message"]
+    if status == "unknown":
+        assert record["error_message"] == "fixture reason"
+    else:
+        assert record["error_message"] is None
 
 
 def test_real_page_waits_past_prototype_delay() -> None:

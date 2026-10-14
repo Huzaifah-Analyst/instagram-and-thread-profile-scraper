@@ -151,3 +151,13 @@
 - Final complete suite, including further CLI login-flag and analyzer regressions: 260 passed in 53.71s, zero skips.
 - Real Chromium synthetic page is blank until 1.5 seconds, then classified Active by polling. Ambiguous markerless page remains Unknown at a bounded deadline. These are correctness fixtures, not live speed benchmarks.
 - No live runs performed, no checker profiles opened, no 100-target time or Smart Combined saving measured. Raw test outputs: implementation/evidence/targeted-modes-*.txt.
+
+
+## Targeted modes review fixes (14 October 2026)
+
+- Baseline: 260 passed in 77.73s; focused reporting/classifier/Tk regressions: 58 passed in 11.76s.
+- Triple collection of output-selection tests with a module-scoped root: 17 passed, 7 setup errors in 14.52s. Tk initialization failed on the third module collection; retained as evidence.
+- Corrected to a session-scoped root with fresh settings/widgets and a subprocess for restart verification: identical stress command passed 24 cases in 18.60s. No skip/retry plugin and no weakened assertions.
+- Final full suite: 278 passed in 73.10s, zero skips.
+- Complete Combined records matched the parent builder on 5,184 synthetic input pairs; zero differences. No live platform requests or benchmark in this task.
+- [Report and raw outputs](implementation/round12-review-fixes.md).
