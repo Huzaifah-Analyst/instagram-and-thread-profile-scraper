@@ -1,9 +1,8 @@
 """Multi-worker concurrent dispatcher (TSK-105).
 
-One persistent Chromium context (so every worker shares the logged-in checker
-session) hosts N pages. The username list is split into N balanced chunks and
-each page works through its chunk with human-like delays. Results are pushed
-to a progress callback as soon as each account finishes.
+Up to five worker pages consume a shared target queue across verified persistent
+checker contexts. Healthy contexts supply additional pages when fewer accounts
+than workers are selected. Completed rows are streamed to the UI.
 
 Usage from the command line::
 
@@ -24,50 +23,40 @@ import time
 from pathlib import Path
 from typing import Callable, Optional, Union
 
-from playwright.async_api import BrowserContext, Page, async_playwright
-from playwright.async_api import Error as PlaywrightError
+from playwright.async_api import BrowserContext, Page
 
 from src.core.ban_engine import (
     COMPOSITE_BLOCKED,
     STATUS_ERROR,
-    STATUS_NOT_FOUND,
     STATUS_SESSION_BLOCKED,
-    BanLinkEngine,
 )
-from src.core.extractors import extract_instagram, extract_threads
+from src.core.extractors import (
+    DIALOG_TIMEOUT_S,
+    MENU_CLICK_TIMEOUT_S,
+    PAGE_READY_TIMEOUT_S,
+    extract_instagram,
+    extract_threads,
+)
 from src.core.resource_blocker import BlockerStats, attach_resource_blocker
+from src.core.checkers import Checker, CheckerStore
+from src.core.checker_health import login_session
+from src.core.diagnostics import RunJournal
+from src.core.paths import DEFAULT_PROFILE_DIR
+from src.core.validation import clean_usernames, positive_seconds
+from src.core.about_parser import country_is_disclosed
+
+from src.core.modes import (
+    MODE_IG_ONLY, MODE_THREADS_ONLY, MODE_COMBINED, MODE_COMBINED_SMART,
+    MODE_IG_STATUS_ONLY, MODES,
+)
+from src.core.result_records import build_record
 
 logger = logging.getLogger(__name__)
 
-MODE_IG_ONLY = "ig_only"
-MODE_THREADS_ONLY = "threads_only"
-MODE_COMBINED = "combined"
-MODES = (MODE_IG_ONLY, MODE_THREADS_ONLY, MODE_COMBINED)
-
-DEFAULT_PROFILE_DIR = Path("browser_profile")
 DEFAULT_WORKERS = 5
 VIEWPORT = {"width": 1280, "height": 800}  # Threads menu detection assumes this width.
 
 ProgressCallback = Callable[[int, int, dict], None]
-
-
-def clean_usernames(raw: list[str]) -> list[str]:
-    """Strips whitespace and leading ``@``, drops blanks and duplicates (order kept).
-
-    Args:
-        raw: Usernames as pasted or read from a file.
-
-    Returns:
-        Clean, de-duplicated usernames.
-    """
-    seen: set[str] = set()
-    cleaned: list[str] = []
-    for name in raw:
-        user = name.strip().lstrip("@").strip()
-        if user and user.lower() not in seen:
-            seen.add(user.lower())
-            cleaned.append(user)
-    return cleaned
 
 
 def chunk_usernames(usernames: list[str], workers: int) -> list[list[str]]:
@@ -100,37 +89,8 @@ def empty_platform_result() -> dict:
     return {"status": None, "date_joined": None, "join_badge": None, "country": None, "error": None}
 
 
-def build_record(username: str, ig: dict, threads: dict, seconds: float) -> dict:
-    """Merges both platform results into one record (matches ``run_items`` schema).
-
-    Args:
-        username: Account username.
-        ig: Instagram extractor result (or ``empty_platform_result()``).
-        threads: Threads extractor result (or ``empty_platform_result()``).
-        seconds: Total time spent on this account.
-
-    Returns:
-        Flat result record.
-    """
-    verdict = BanLinkEngine.evaluate(ig["status"], threads["status"])
-    errors = [e for e in (ig.get("error"), threads.get("error")) if e]
-    return {
-        "username": username,
-        "composite_status": verdict["composite_status"],
-        "ig_status": verdict["ig_status"],
-        "ig_country": ig.get("country"),
-        "ig_date_joined": ig.get("date_joined"),
-        "threads_status": verdict["threads_status"],
-        "threads_country": threads.get("country"),
-        "threads_date_joined": threads.get("date_joined"),
-        "threads_badge": threads.get("join_badge"),
-        "seconds": round(seconds, 2),
-        "error_message": "; ".join(errors) or None,
-    }
-
-
 class MultiWorkerScraper:
-    """Checks many accounts in parallel using pages of one persistent context."""
+    """Checks targets on parallel pages allocated across verified checker logins."""
 
     def __init__(
         self,
@@ -140,31 +100,74 @@ class MultiWorkerScraper:
         headless: bool = True,
         min_delay: float = 4.0,
         max_delay: float = 8.0,
+        page_ready_timeout_s: float = PAGE_READY_TIMEOUT_S,
+        dialog_timeout_s: float = DIALOG_TIMEOUT_S,
+        menu_click_timeout_s: float = MENU_CLICK_TIMEOUT_S,
+        debug_dump: bool = False,
         progress_callback: Optional[ProgressCallback] = None,
+        checkers: Optional[list[Checker]] = None,
+        persist_results: bool = False,
+        resource_blocker_enabled: bool = True,
     ) -> None:
         """Configures the scraper.
 
         Args:
             profile_dir: Chromium user-data dir holding the checker login session.
-            workers: Number of concurrent pages.
-            mode: ``ig_only``, ``threads_only`` or ``combined``.
+            workers: Number of concurrent worker pages (1 to 5).
+            mode: One of MODES; Combined remains the default.
             headless: Run Chromium without a visible window.
             min_delay: Minimum pause between accounts on one worker (seconds).
             max_delay: Maximum pause between accounts on one worker (seconds).
+            page_ready_timeout_s: How long an extractor waits for a profile page
+                to become classifiable. The default was sized against solo-page
+                timing; widen it to test whether concurrent-worker load needs a
+                larger budget (see `docs/ISSUE_concurrent_session_detection.md`).
+            dialog_timeout_s: How long an extractor waits for the transparency
+                dialog/panel to render parseable text.
+            menu_click_timeout_s: How long an extractor waits for a menu item
+                to appear before clicking it.
+            debug_dump: If true, every dialog/panel text actually seen is
+                written to ``debug/`` (git-ignored) for post-mortem review --
+                e.g. to confirm a parsed join date is genuine, not a stale or
+                decoy value. See `docs/memory.md`'s 2026-10-10 live test entry.
+            resource_blocker_enabled: Disable only for controlled network diagnostics.
+                The default retains media/font blocking on each worker page.
             progress_callback: Called as ``(done, total, record)`` after each account.
                 It runs on the scraper's event-loop thread, so GUI code should
                 hand the record to a queue rather than touch widgets directly.
         """
         if mode not in MODES:
             raise ValueError(f"mode must be one of {MODES}")
-        if min_delay > max_delay:
-            raise ValueError("min_delay must be <= max_delay")
+        if min_delay < 0 or max_delay < 0 or min_delay > max_delay:
+            raise ValueError("Delays must be nonnegative and min_delay <= max_delay")
+        if not 1 <= workers <= 5:
+            raise ValueError("Workers must be between 1 and 5.")
+        for budget in (page_ready_timeout_s, dialog_timeout_s, menu_click_timeout_s):
+            positive_seconds(budget)
+        self.checkers = checkers if checkers is not None else [Checker("checker_1", Path(profile_dir), True)]
+        if mode == MODE_IG_STATUS_ONLY:
+            self.checkers = []
+        if mode != MODE_IG_STATUS_ONLY and (not self.checkers or len(self.checkers) > 5):
+            raise ValueError("Select between 1 and 5 checkers.")
+        paths = {str(checker.profile_dir.resolve()).casefold() for checker in self.checkers}
+        if len(paths) != len(self.checkers):
+            raise ValueError("Each checker must have a separate browser profile.")
+        self.checker_health: dict[str, dict] = {}
+        self.active_checker_ids: list[str] = []
+        self.unstarted_usernames: list[str] = []
+        self.journal = RunJournal() if persist_results else None
+        self.journal_error: str | None = None
         self.profile_dir = Path(profile_dir)
         self.workers = workers
         self.mode = mode
         self.headless = headless
         self.min_delay = min_delay
         self.max_delay = max_delay
+        self.page_ready_timeout_s = page_ready_timeout_s
+        self.dialog_timeout_s = dialog_timeout_s
+        self.menu_click_timeout_s = menu_click_timeout_s
+        self.debug_dump = debug_dump
+        self.resource_blocker_enabled = resource_blocker_enabled
         self.progress_callback = progress_callback
         self.blocker_stats: list[BlockerStats] = []
         self.stop_reason: Optional[str] = None
@@ -219,37 +222,46 @@ class MultiWorkerScraper:
             Accounts skipped because of a stop are not included; see ``stop_reason``.
         """
         users = clean_usernames(usernames)
+        self.unstarted_usernames = list(users)
         chunks = chunk_usernames(users, self.workers)
         self._done, self._total = 0, len(users)
         if not chunks:
             return []
 
-        results: dict[int, dict] = {}
-        self.profile_dir.mkdir(parents=True, exist_ok=True)
-        async with async_playwright() as pw:
-            context = await pw.chromium.launch_persistent_context(
-                user_data_dir=str(self.profile_dir), headless=self.headless, viewport=VIEWPORT
-            )
-            try:
-                pages = await self._open_pages(context, len(chunks))
-                offset = 0
-                jobs = []
-                for worker_id, (page, chunk) in enumerate(zip(pages, chunks)):
-                    indexed = list(enumerate(chunk, start=offset))
-                    offset += len(chunk)
-                    jobs.append(self._worker(worker_id, page, indexed, results))
-                await asyncio.gather(*jobs)
-            finally:
-                await context.close()
+        from src.core.checker_pool import run_pool
 
-        return [results[i] for i in sorted(results)]
+        if self.is_stopped:
+            return []
+        if self.journal is not None:
+            self._save_event({
+                "event": "started", "mode": self.mode, "target_count": len(users),
+                "checkers": [c.checker_id for c in self.checkers],
+                "dialog_timeout_s": self.dialog_timeout_s,
+                "menu_timeout_s": self.menu_click_timeout_s,
+            })
+        if self.mode == MODE_IG_STATUS_ONLY:
+            from src.core.anonymous_status import run_anonymous
+
+            records = await run_anonymous(self, users)
+        else:
+            records = await run_pool(self, users)
+        processed = {record["username"] for record in records}
+        self.unstarted_usernames = [user for user in users if user not in processed]
+        if self.journal is not None:
+            self._save_event({"event": "finished", "count": len(records),
+                                 "stop_reason": self.stop_reason,
+                                 "active_checkers": self.active_checker_ids,
+                                 "unstarted_usernames": self.unstarted_usernames,
+                                 "checker_health": self.checker_health})
+        return records
 
     async def _open_pages(self, context: BrowserContext, count: int) -> list[Page]:
         """Creates ``count`` worker pages, each with its own resource blocker."""
         pages = list(context.pages[:count])
         while len(pages) < count:
             pages.append(await context.new_page())
-        self.blocker_stats = [await attach_resource_blocker(page) for page in pages]
+        self.blocker_stats = ([await attach_resource_blocker(page) for page in pages]
+                              if self.resource_blocker_enabled else [])
         return pages
 
     async def _worker(self, worker_id: int, page: Page, items: list[tuple[int, str]], results: dict[int, dict]) -> None:
@@ -275,34 +287,64 @@ class MultiWorkerScraper:
 
     async def _check_account(self, page: Page, username: str) -> dict:
         """Runs the extractors required by the current mode for one account."""
+        if self.mode == MODE_IG_STATUS_ONLY:
+            from src.core.anonymous_status import check_status
+
+            return await check_status(page, username, self.page_ready_timeout_s)
         t0 = time.monotonic()
         ig = empty_platform_result()
         threads = empty_platform_result()
-        try:
-            if self.mode in (MODE_IG_ONLY, MODE_COMBINED):
-                ig = await extract_instagram(page, username)
-            # Combined mode: a missing IG account has no Threads profile, and a
-            # blocked session must not keep hitting Meta.
-            skip_threads = self.mode == MODE_COMBINED and ig["status"] in (STATUS_NOT_FOUND, STATUS_SESSION_BLOCKED)
-            if self.mode in (MODE_THREADS_ONLY, MODE_COMBINED) and not skip_threads:
-                threads = await extract_threads(page, username)
-        except PlaywrightError as exc:
-            logger.error("Unexpected browser error for @%s: %s", username, exc)
-            failed = {**empty_platform_result(), "status": STATUS_ERROR, "error": f"Browser error: {exc}"}
-            if ig["status"] is None and self.mode != MODE_THREADS_ONLY:
-                ig = failed
+        timeout_kwargs = {
+            "page_ready_timeout_s": self.page_ready_timeout_s,
+            "dialog_timeout_s": self.dialog_timeout_s,
+            "menu_click_timeout_s": self.menu_click_timeout_s,
+            "debug_dump": self.debug_dump,
+        }
+        for platform, extract in (("ig", extract_instagram), ("threads", extract_threads)):
+            if (platform == "ig" and self.mode == MODE_THREADS_ONLY or
+                    platform == "threads" and self.mode == MODE_IG_ONLY):
+                continue
+            if self.is_stopped or ig["status"] == STATUS_SESSION_BLOCKED:
+                break
+            if (platform == "threads" and self.mode == MODE_COMBINED_SMART
+                    and country_is_disclosed(ig.get("country"))):
+                threads = {**empty_platform_result(), "status": "skipped_ig_sufficient",
+                           "stage": "skipped"}
+                continue
+            try:
+                result = await extract(page, username, **timeout_kwargs)
+            except Exception as exc:
+                reason = f"{platform} extraction failed ({type(exc).__name__})"
+                logger.error("%s for @%s", reason, username)
+                result = {**empty_platform_result(), "status": STATUS_ERROR,
+                          "stage": "extractor_error", "error": reason}
+            if platform == "ig":
+                ig = result
             else:
-                threads = failed
-        return build_record(username, ig, threads, time.monotonic() - t0)
+                threads = result
+            if result["status"] == STATUS_SESSION_BLOCKED:
+                self.stop(f"Checker session blocked while checking @{username}: {result.get('error')}")
+        return build_record(username, ig, threads, time.monotonic() - t0, mode=self.mode)
 
     def _emit(self, record: dict) -> None:
         """Sends a record to the progress callback without letting it crash a worker."""
+        self._save_event(record)
         if self.progress_callback is None:
             return
         try:
             self.progress_callback(self._done, self._total, record)
         except Exception:  # noqa: BLE001 - a broken UI callback must not kill the run
             logger.exception("Progress callback raised")
+
+    def _save_event(self, record: dict) -> None:
+        """Keep in-memory/UI results available when journal storage fails."""
+        if self.journal is None:
+            return
+        try:
+            self.journal.append(record)
+        except (OSError, TypeError, ValueError) as exc:
+            self.journal_error = f"Result journal unavailable ({type(exc).__name__})"
+            logger.error(self.journal_error)
 
     async def _wait_while_paused(self) -> None:
         """Blocks this worker while paused; ``stop()`` also releases it."""
@@ -315,20 +357,6 @@ class MultiWorkerScraper:
             await asyncio.to_thread(self._stop.wait, seconds)
 
 
-async def login_session(profile_dir: Path) -> None:
-    """Opens a visible browser on the profile dir for one-time manual login."""
-    profile_dir.mkdir(parents=True, exist_ok=True)
-    async with async_playwright() as pw:
-        context = await pw.chromium.launch_persistent_context(
-            user_data_dir=str(profile_dir), headless=False, viewport=VIEWPORT
-        )
-        page = context.pages[0] if context.pages else await context.new_page()
-        await page.goto("https://www.instagram.com/accounts/login/")
-        logger.info("Log in to Instagram (and Threads) with the checker account, then close the browser window.")
-        closed = asyncio.Event()
-        context.on("close", lambda _ctx: closed.set())
-        await closed.wait()
-
 
 def main() -> None:
     """Command-line entry point for manual testing of the engine."""
@@ -338,8 +366,24 @@ def main() -> None:
     parser.add_argument("--mode", choices=MODES, default=MODE_COMBINED)
     parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS)
     parser.add_argument("--profile", type=Path, default=DEFAULT_PROFILE_DIR)
+    parser.add_argument("--checkers", help="Comma-separated checker numbers, e.g. 1,2,3,4,5")
+    parser.add_argument("--login-checker", type=int, choices=range(1, 6), help="Login a named checker slot")
+    parser.add_argument("--no-resource-blocker", action="store_false",
+                        dest="resource_blocker_enabled",
+                        help="Diagnostic: allow all resources (blocking is on by default)")
     parser.add_argument("--headed", action="store_true", help="Show the browser windows")
     parser.add_argument("--login", action="store_true", help="Open a browser for one-time login")
+    parser.add_argument("--page-ready-timeout", type=float, default=PAGE_READY_TIMEOUT_S,
+                        help="Seconds to wait for a profile page to become classifiable "
+                             "(widen this under concurrent-worker load; see "
+                             "docs/ISSUE_concurrent_session_detection.md)")
+    parser.add_argument("--dialog-timeout", type=float, default=DIALOG_TIMEOUT_S,
+                        help="Seconds to wait for the transparency dialog/panel to render")
+    parser.add_argument("--menu-click-timeout", type=float, default=MENU_CLICK_TIMEOUT_S,
+                        help="Seconds to wait for a menu item to appear before clicking it")
+    parser.add_argument("--debug-dump", action="store_true",
+                        help="Write every dialog/panel text seen to debug/ (git-ignored), to "
+                             "check whether a parsed value is genuine vs. stale/decoy data")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -347,8 +391,11 @@ def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
-    if args.login:
-        asyncio.run(login_session(args.profile))
+    if args.mode == MODE_IG_STATUS_ONLY and (args.login or args.login_checker):
+        parser.error("ig_status_only uses no login; omit --login and --login-checker")
+    if args.login or args.login_checker:
+        slot = CheckerStore(args.profile).load()[(args.login_checker or 1) - 1]
+        print(asyncio.run(login_session(slot.profile_dir, expected_username=slot.username)))
         return
 
     names = list(args.usernames)
@@ -357,8 +404,19 @@ def main() -> None:
     if not names:
         parser.error("give usernames or --file")
 
+    slots = [] if args.mode == MODE_IG_STATUS_ONLY else CheckerStore(args.profile).load()
+    selected = [slot for slot in slots if slot.enabled]
+    if args.checkers and args.mode != MODE_IG_STATUS_ONLY:
+        numbers = args.checkers.split(",")
+        if not numbers or any(n not in {"1", "2", "3", "4", "5"} for n in numbers) or len(set(numbers)) != len(numbers):
+            parser.error("--checkers must list distinct slots from 1 to 5")
+        selected = [slots[int(n) - 1] for n in numbers]
     scraper = MultiWorkerScraper(profile_dir=args.profile, workers=args.workers, mode=args.mode,
-                                 headless=not args.headed)
+                                 checkers=selected, persist_results=True,
+                                 headless=not args.headed, page_ready_timeout_s=args.page_ready_timeout,
+                                 dialog_timeout_s=args.dialog_timeout, menu_click_timeout_s=args.menu_click_timeout,
+                                 debug_dump=args.debug_dump,
+                                 resource_blocker_enabled=args.resource_blocker_enabled)
     t0 = time.monotonic()
     records = scraper.run(names)
     elapsed = time.monotonic() - t0

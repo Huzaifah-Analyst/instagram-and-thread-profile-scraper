@@ -124,3 +124,225 @@ First live tests against real Instagram/Threads with an actual checker account, 
 - **Revised working hypothesis:** this may be a **local resource/timeout problem, not only a Meta anti-bot problem**. Five Chromium pages loading Instagram at once on one machine may simply make each page slower to become interactive than when it is the only page running. `extract_instagram`'s polling budgets (`PAGE_READY_TIMEOUT_S = 8.0`, `DIALOG_TIMEOUT_S = 8.0`, the 4.0s menu-click deadline in `_click_menu_item`) were presumably sized against solo-page timing, not 5-way concurrent timing. If pages are simply rendering slower under load, every worker would time out at the same budget, with no Meta challenge required, exactly what was observed.
 - **This does not rule out Meta detection too.** Both can be true at once (slower under load, AND more likely to get challenged under load). Incident 5's 2 explicit blocks still need explaining; Test B just shows the silent-failure part does not require a block to happen.
 - **Suggested additional diagnostic (cheap, no extra live requests needed to design it):** temporarily double `PAGE_READY_TIMEOUT_S`, `DIALOG_TIMEOUT_S` and the 4.0s menu-click deadline in `src/core/extractors.py`, and re-run the same 10 to 11 account batch. If results come back with real data this time, the root cause is timeout budgets being too tight under concurrent load, a straightforward fix (raise the constants, or stagger workers more). If it still comes back all `N/A`, that points back toward Meta-side detection and the original 1-worker-vs-5-worker isolation test is still needed.
+
+### Fix Attempt 1 (2026-10-10, `fix/concurrent-timeouts`): made the timeout budgets and GUI worker count configurable; not yet live-verified
+
+**No live checker account or Instagram session was available in this environment**, so none of this was tested against the real site. Nothing below should be read as "the concurrent-run bug is fixed" — only as the groundwork so Huzaifah can run the two diagnostics `ISSUE_concurrent_session_detection.md` §5 already suggested, without a code change in between.
+
+- **`src/core/extractors.py`:** `PAGE_READY_TIMEOUT_S`, `DIALOG_TIMEOUT_S` and the 4.0s menu-click deadline (now a named constant, `MENU_CLICK_TIMEOUT_S`) are unchanged as defaults, but `extract_instagram`, `extract_threads`, and their internal `_open_profile` / `_poll_dialog` / `_click_menu_item` helpers now accept them as parameters. `MultiWorkerScraper.__init__` takes the same three as `page_ready_timeout_s` / `dialog_timeout_s` / `menu_click_timeout_s` keyword args (same pattern as the existing `min_delay`/`max_delay`), and `scraper.py`'s CLI gained matching `--page-ready-timeout` / `--dialog-timeout` / `--menu-click-timeout` flags. This lets Huzaifah run, for example, `python -m src.core.scraper --workers 5 --page-ready-timeout 16 --dialog-timeout 16 --menu-click-timeout 8 <usernames>` to test the "double the budgets" diagnostic without touching code, and separately `--workers 1` to run the concurrency-vs-account isolation test from §5 item 2.
+- **GUI worker count:** `MetaInspectorApp._default_factory` (`src/gui/app.py`) silently relied on `MultiWorkerScraper`'s `DEFAULT_WORKERS = 5` default; there was no way to run fewer workers from the GUI, only from the CLI's existing `--workers` flag. Added a "Workers" dropdown (1 to 5, default 5) to `LeftPanel` (`src/gui/components/left_panel.py`) so the 1-worker isolation test can also be run from the desktop app, not just the CLI.
+- **Error visibility (independent of root cause, already flagged as a real gap in §3.3 above):** `data_table.py`'s live results table had no column for `error_message`, so an `ACTIVE` row with no country/joined data was visually identical to "nothing to report." Added an `Error` column to `DataTable.COLUMNS` / `record_to_row`, blank when there's no error. **Scope note:** the clipboard TSV copy and `SHEET_COLUMNS` mentioned in the original directive live in `src/core/records.py`, which only exists on `feature/sprint3-sheets-export` (not yet merged into `dev` as of this writing, per §3.3's "pending Huzaifah's go-ahead") — so that half of the ask isn't applicable yet on `dev`. It should be revisited once Sprint 3 merges.
+- **Tests:** `tests/test_core_helpers.py` gained two tests asserting the new `MultiWorkerScraper` timeout kwargs default to the extractor constants and are actually stored when overridden. `tests/test_gui_bridge.py` gained a test that the Workers dropdown actually changes what `_default_factory` builds, plus a test that `record_to_row` surfaces `error_message`; the existing `test_record_to_row` was updated for the new 9th column. Full suite: 61 passed, 1 skipped (pre-existing, unrelated: a local Tcl/Tk install path issue that intermittently skips the real-window GUI smoke test on this machine, confirmed by re-running it repeatedly against the unmodified code).
+- **Still open, needs live access to resolve:** which of Hypothesis 1 (Meta-side detection) or Hypothesis 2 (tight timeout budget under load) — or both — actually explains the data loss. That requires running the two diagnostics above against the real checker account, which this session could not do.
+
+### Sprint 4 (2026-10-10, `feature/sprint4-speed-tuning`, branched from `fix/concurrent-timeouts`): implemented what does not require live access; TSK-401/402/403 still need Huzaifah's manual run
+
+**Branching note:** per `team_roles_and_workflow.md` §4 the normal rule is "branch each sprint from latest `dev`." This branch is instead stacked on `fix/concurrent-timeouts` (not yet merged), because TSK-401's benchmark and TSK-403's fail-safe check are meaningless without the configurable timeouts/worker count that fix adds. Both branches need to land before `dev` is caught up; `fix/concurrent-timeouts` should be reviewed/merged first.
+
+- **TSK-401 (100-account benchmark):** Not run. No live checker account in this environment. The CLI (`python -m src.core.scraper`) and GUI already print/display elapsed time and per-account duration, so no new code was needed to capture the benchmark; Huzaifah still needs to run it and record the real number against the 4-5 minute NFR-1 target.
+- **TSK-402 (edge cases):** Added `tests/test_extractor_edge_cases.py` — a minimal fake Playwright `Page` driving `extract_instagram`/`extract_threads` through four shapes: IG active-but-no-"Options"-button, IG not-found, Threads inactive-profile-with-no-menu (the quirk already named in memory.md §4.1), and an IG account with no Threads presence. All four confirm the extractor returns a clean status with `error` set and does not raise or hang. **This is not the same as TSK-402's actual acceptance criteria**, which calls for running these against real private/non-existent/no-Threads accounts; a fake page can't reproduce Meta's actual DOM, only the control-flow shape the code is meant to handle.
+- **TSK-403 (fail-safe abort under load):** Added `test_worker_stops_immediately_when_session_is_blocked` in `tests/test_core_helpers.py`, which monkeypatches `extract_instagram` to return `session_blocked` partway through a 3-account chunk and asserts `MultiWorkerScraper._worker` stops before the next account and `stop_reason` names the account. This confirms the abort wiring itself (no browser involved). It does not confirm the abort still fires reliably under a real 5-worker run against a real Meta challenge, which is what TSK-403 actually asks for.
+- **TSK-404 (UI polish):** Found and fixed a real, verifiable bug while reviewing `data_table.py` for "responsiveness at minimum size": the table's columns sum to ~920px (920px exactly: 40+130+90+95+105+110+125+65+160, the last being the new Error column from the concurrent-timeouts fix), but `theme.WINDOW_MIN_SIZE` is `(950, 600)` and the table only gets the window width minus the 320px left panel, about 600px. There was no horizontal scrollbar, so several columns were simply unreachable at the minimum window size (and were already tight before the Error column, which made it worse). Added a horizontal `CTkScrollbar` bound to the Treeview's `xview`. **Not independently verified by eye** — this machine's Tk/Tcl install does not expose a way for this session to screenshot a live window (see the intermittent skip noted in the Phase 1 entry above), so the fix is confirmed by code review and the arithmetic above, not a screenshot. Hover colors were already present on every button/radio/option-menu before this sprint; no further changes made there without being able to see them rendered.
+
+**Honest summary for this sprint:** of TSK-401 to TSK-404, only TSK-404 got an actual bug fixed and explained here. TSK-401, 402 and 403 got test/tooling groundwork so Huzaifah's manual pass is faster, but none of them can be marked `[x]` in `docs/tasks.md` yet — their acceptance criteria specifically require a real run against live Instagram/Threads, which this environment cannot do.
+
+### Sprint 5 (2026-10-10, `feature/sprint5-exe-packaging`, branched from `feature/sprint4-speed-tuning`)
+
+**TSK-501 (PyInstaller `.spec` under 150MB): built successfully, target missed by more than 2x — measured, not estimated.**
+
+- `config/metainspector.spec` (new; `.gitignore`'s blanket `*.spec` rule was narrowed to `/*.spec` so this one can be tracked — it was silently ignoring the exact deliverable TSK-501 asks for) bundles Playwright's own driver (`playwright/driver`, 102MB) and its Chromium build (`chromium-1243` under `~/AppData/Local/ms-playwright`, 432MB) as onefile data, so the client's machine never needs `playwright install` run on it. `main.py` points `PLAYWRIGHT_BROWSERS_PATH` at the bundled copy, but only when `sys.frozen` is true, so `python main.py` during development is unaffected.
+- **Actually built it:** `pyinstaller config/metainspector.spec --distpath dist --workpath build`. Succeeded on the first real attempt (PyInstaller's own `hook-playwright.async_api.py` and the `pyinstaller-hooks-contrib` `hook-customtkinter.py`/`hook-pandas.py` handled the rest without manual hidden-import hacking).
+- **Actually ran it:** launched `dist/MetaInspectorDesktop.exe` directly on this machine (not a clean one — see TSK-502 below) and confirmed it stays running past 30s without crashing or printing a traceback (checked via a temporary `console=True` rebuild, then reverted to `console=False` for the real artifact). That is the most this environment can verify; no checker login or scrape was attempted through it.
+- **Measured size: 309.9 MB** (`os.path.getsize` on the actual file, twice, across two separate builds). That is **more than double** the 150MB target in `docs/PRD.md` NFR-3. Breakdown: Chromium alone is 432MB on disk before any packing, the Playwright Node driver is another 102MB, and PyInstaller still has to fold in Python itself plus `customtkinter`, `pandas` (pulls in `numpy`/`pyarrow`), and `openpyxl`. `upx` is not installed in this environment, so no UPX compression was applied or measured; even with it, UPX mainly shrinks executable code sections, not Chromium's already-dense data files, so it would not plausibly close a ~160MB gap on its own.
+- **What would actually need to change to approach 150MB**, in case Huzaifah wants to pursue it rather than revise the target: (1) swap `chromium-1243` for `chromium_headless_shell-1243` (270MB instead of 432MB) — but this app calls `pw.chromium.launch_persistent_context`, which needs full Chromium, not the headless-shell variant, so that would require a code change, not just a packaging change; (2) drop `pandas`/`openpyxl` as hard dependencies if CSV/Excel export can be done with the standard library instead (`csv` module + a lighter `.xlsx` writer) — not attempted here, out of scope for this sprint; (3) accept `onedir` instead of `onefile` and ship a folder — doesn't reduce total bytes, just changes how they're laid out, so it does not help NFR-3 as written. None of these were implemented; this is left for Huzaifah to decide since (1) and (2) are behavior/dependency changes, not packaging tweaks.
+- **Recommendation:** revise NFR-3 in `docs/PRD.md`, or accept a much larger number, rather than treat 150MB as achievable while this app bundles its own Chromium. 150MB was likely written before anyone measured what Playwright's Chromium actually weighs.
+
+**TSK-502 (test the .exe on a clean Windows machine without Python): not done, no such machine available in this environment.** Manual steps for Huzaifah to verify this himself:
+1. Copy only `dist/MetaInspectorDesktop.exe` (309.9MB, single file) to a Windows 10/11 machine that has never had Python or Playwright installed — a spare laptop, a fresh VM, or a cloud Windows instance all work, as long as nothing in `pip` has ever touched it.
+2. Double-click it (or `MetaInspectorDesktop.exe` from a `cmd` prompt to see any error dialog's text). It should open the same dark-themed window `python main.py` does in this dev environment.
+3. Click "Setup Checker Account" and confirm the embedded Chromium window opens for login (this proves the bundled browser, not a system one, is what's launching — a clean machine has no other Chromium to fall back to, so if this fails the bundling is broken, not masked by a dev-machine fallback).
+4. Paste 2-3 test usernames and run a check, same as any normal run.
+5. Report back whether steps 2-4 worked, and if not, the exact error text/dialog — that's the fastest way to find a bundling gap this environment's launch-and-wait-30-seconds smoke test can't catch (e.g. a missing DLL that only matters on a machine without the Visual C++ redistributable Python's own installer normally pulls in).
+
+**TSK-503 (Quick Start guide):** see `docs/QUICK_START.md` (new file), written for the non-technical client persona from `docs/PRD.md` §2. Covers first-time setup, the one-time checker login, pasting usernames, starting a check, copying to Google Sheets, exporting files, and viewing run history. The Google Sheets paste and history/export steps describe the Sprint 3 features (`feature/sprint3-sheets-export`), which are implemented and tested (86/86 per §3.3 above) but not yet merged into `dev`; the guide is written against where the product is headed once that merges, not against current `dev`, and should be re-checked against the shipped build before handover.
+
+**TSK-504:** skipped, per the directive — final handover is between Huzaifah and the client.
+
+---
+
+## 6. Test C (2026-10-10, `fix/live-test-findings`): first live GUI runs with a saved checker session, and the fixes they led to
+
+Huzaifah ran 5 live GUI sessions against `feature/sprint5-exe-packaging` (solo/1-account, 1-worker, 3-worker/95-account Combined, 5-worker/95-account IG-only, 5-worker/95-account Threads-only), using the `browser_profile/` session already saved on this machine from earlier testing. This session did not initiate any of these live requests itself (see the earlier back-and-forth in this log about not touching a live checker session without Huzaifah driving it); the screenshots were reviewed after the fact.
+
+### 6.1 What the screenshots showed
+
+- **Solo run (Workers=5 setting, 1 account), Combined:** `zaifi._.302` → ACTIVE, Country/Joined both N/A, error `IG about dialog did not load within timeout`, **48.9s** for one account.
+- **1-worker run, same account, Combined:** IG succeeded this time — Country **Pakistan**, Joined **November 2019** (matches Test A from 2026-10-07) — but Threads failed with a raw `Threads error: Locator.click: Timeout 5000ms exceeded.\nCall log:\n...`. **49.9s** total.
+- **3-worker, 95-account, Combined:** stopped itself after 30 accounts — `Stopped after 30 accounts: Meta challenged the checker account.` The blocked row (`@howard.8991`) showed composite `BLOCKED` with `Threads session blocked: Redirected to ...`. Of the other 29: the single most common error was `Threads 'About this profile' option not found` (roughly half the rows); a few showed the same raw `Locator.click: Timeout` as above, with much longer durations (37.8s, 40.5s); one showed `Threads profile menu not found` (the documented inactive-profile quirk); one IG row showed `IG about dialog did not load within timeout`. Nearly every row that did get an IG country also got IG Joined = **"October 2025"** — for dozens of unrelated accounts.
+- **5-worker, 95-account, Instagram Only:** completed all 95 in 4m03s (within the 4-5 min NFR-1 target, though IG-only is the easier of the three modes). Same `IG about dialog did not load` errors on some rows; same suspicious "October 2025" clustering on most successful ones.
+- **5-worker, 95-account, Threads Only:** `@howard.8991` got `BLOCKED` again, this time at list position 18 instead of 30 (worker count changes where a given username lands in the processing order, so this is not evidence the block is account-specific — see below). Virtually every other row before the block showed `Threads 'About this profile' option not found`.
+
+### 6.2 Root-cause analysis (grounded in the code as of `fix/concurrent-timeouts`, before this round's fixes)
+
+1. **`Threads 'About this profile' option not found` (by far the most common failure):** this error can only be reached after the "..." menu button was already found *and* clicked (`extractors.py` `extract_threads`, the line right before it). The failure is `_click_menu_item` not finding the "About this profile" text within `MENU_CLICK_TIMEOUT_S`. **That constant was 4.0s, and — this is the real gap — the GUI had no way to raise it.** `fix/concurrent-timeouts` added `--menu-click-timeout` to the CLI, but `MetaInspectorApp._default_factory` never passed it through, so every GUI run, including all 5 of these, used the hardcoded 4.0s default regardless of intent.
+2. **Raw `Locator.click: Timeout ... Call log:` (34-40s durations):** a different failure mode from #1 — Playwright *located* the element but its own internal actionability timeout (~30s default) was hit trying to click it, most likely because `_find_threads_menu_button`'s fallback path clicks a raw `<svg>` element directly when no clickable ancestor `div[role=button]` exists, and SVGs are frequently not "stable"/unobscured enough for Playwright's default click to complete. This exception was also being dumped into the UI's Error column verbatim, including Playwright's multi-line "Call log:" trace, visibly breaking the row's height.
+3. **`IG about dialog did not load within timeout`:** same shape as #1 but for IG's dialog render step (`DIALOG_TIMEOUT_S`, also 4-8s default, also not GUI-configurable before this fix).
+4. **The "October 2025" clustering is the most concerning finding and is *not* explained by anything above.** This value is parsed from real dialog text (`parse_about_dialog` only returns a date when it actually matched a label line), so the dialog did open and did contain a line reading "October 2025" for dozens of unrelated accounts. Two explanations remain open, and this session could not distinguish between them without seeing the raw dialog text: (a) `DATE_KEYS` in `extractors.py` includes the bare word `"joined"` (needed for Threads' real label format, confirmed by existing tests) — if Instagram's current dialog has picked up some *other* line that is exactly "Joined" in a different context, the parser would confidently extract the wrong line; (b) Meta may be serving a plausible-but-wrong placeholder/decoy value to a session it already suspects is automated, rather than blank data (which is what Incident 5/Test B saw) — which would be *more* dangerous than blank N/A, because these rows have no error flag at all, so an operator has no way to know the value is fake. **This was not fixed, because guessing at a fix without evidence risks silently breaking Threads' currently-correct, tested parsing.** Instead, §6.3 below adds the instrumentation needed to actually answer this.
+5. **Confirmed working as designed: the fail-safe abort (TSK-403).** Both the 3-worker and the 5-worker Threads-only runs stopped the *entire* run the moment `@howard.8991` came back session-blocked, matching `MultiWorkerScraper._worker`'s `COMPOSITE_BLOCKED` handling exactly. The same username triggered the block in both runs at a different *list position* (30th vs. 18th, because the worker count changes the chunking), which points at a request-count/time-based Meta threshold rather than that one account being specially flagged — consistent with Hypothesis 1 in `ISSUE_concurrent_session_detection.md`.
+6. **Baseline is now much slower than historical:** both single-account runs took ~49s total, versus Test A's 21.2s on 2026-10-07 against the same account. This suggests the checker account/session itself may already be somewhat degraded from the earlier Incident 5/Test B testing, independent of concurrency — worth keeping in mind when interpreting any future timing numbers from this same session.
+
+### 6.3 Fixes made in response (none of them re-verified live yet — see 6.4)
+
+- **GUI now exposes Dialog/Menu-click timeouts and a debug-dump checkbox** (`src/gui/components/left_panel.py`, wired through `app.py`'s `_default_factory`). This was the single biggest gap: every number reported above used hardcoded defaults the GUI user had no way to change.
+- **Raised the module defaults themselves**, not just the configurable ceiling: `MENU_CLICK_TIMEOUT_S` 4.0 → 8.0, `DIALOG_TIMEOUT_S` 8.0 → 10.0, `PAGE_READY_TIMEOUT_S` 8.0 → 10.0 (`src/core/extractors.py`). `docs/rules.md` §4 caps dynamic polling at "max 8-10s", so these stay within the project's own stated ceiling. **Trade-off to flag honestly:** if most Threads checks really were failing at the 4s menu-click step, doubling that budget could meaningfully slow down a run that hits this failure often, working against NFR-1's 4-5 minute target — this has not been measured.
+- **Added `_safe_click`:** a 3-stage click (plain → `force=True` → raw JS `el.click()`), each capped at 5s, used everywhere the code clicks a menu/options element. This directly targets failure #2: worst case is now ~10s instead of Playwright's ~30s default, which is a net *improvement* for speed in the failure case even after the default timeout increases above.
+- **Added `_short_error`:** exceptions caught by the broad `except PlaywrightError` blocks are now reduced to one line instead of the full multi-line `str(exc)`, so the UI's Error column (and `data_table.py`'s new `_error_cell`, a second line of defence that also collapses/truncates any stray multi-line or very long message) no longer shows a raw stack-trace-like dump.
+- **Added `debug_dump`** (CLI `--debug-dump`, GUI checkbox "🐛 Save debug captures", off by default): when on, every dialog/panel text actually read is written to `debug/` (git-ignored). This is `ISSUE_concurrent_session_detection.md` §5 item 3, proposed on 2026-10-07 and never implemented until now. **This is the concrete next step for the "October 2025" question** — rerun a small batch with it checked, and the `debug/ig_<username>_<timestamp>.txt` files will show definitively whether the real dialog text says "October 2025" for each of those accounts (a Meta-side issue, nothing to fix here) or something else that the parser is misreading (a real bug in `DATE_KEYS`/`_value_after_label`).
+- Tests: `tests/test_extractor_edge_cases.py` gained 9 new tests (`_safe_click`'s 3 stages, a regression guard that no click stage can take anywhere near Playwright's ~30s default, `_poll_dialog`'s `debug_sink` wiring, `_write_debug_dump`, `_short_error`). `tests/test_core_helpers.py` gained tests that `_check_account` actually forwards the configured timeouts and `debug_dump` to the extractors (not the module defaults). `tests/test_gui_bridge.py` gained a test that the new GUI fields change what `_default_factory` builds, including that invalid timeout input falls back safely instead of crashing. Full suite: **81 passed**, 0 skipped on this run (the pre-existing Tcl/Tk flake noted in earlier entries did not reproduce this time).
+
+### 6.3b Follow-up fix (same day): packaged .exe's "Setup Checker Account" couldn't find its bundled Chromium
+
+Huzaifah then tested the actual packaged `.exe` (not `python main.py`) and clicking "Setup Checker Account" failed: `Login browser failed: : Executable doesn't exist at C:\Users\...\_MEI00004b402\playwright\driver\package\.local-browsers\chromium-1243\chrome-win64\chrome.exe`.
+
+**Root cause:** `main.py`'s `_point_playwright_at_bundled_browsers` (added in the Sprint 5 packaging work) checked `Path(sys.executable).resolve().parent / "ms-playwright"` to find the bundled Chromium. That is correct for a PyInstaller `--onedir` build, but `config/metainspector.spec` builds `--onefile` (the default `EXE(...)` call with no `exclude_binaries`), and a onefile build extracts its bundled data to a **temp directory at `sys._MEIPASS`** at runtime, not next to the `.exe` on disk. So the check always found nothing, the environment variable was never set, and Playwright fell back to its own internal default resolution -- which produced exactly the `.local-browsers` path in the error above, where nothing had ever been installed.
+
+**Fix:** check `sys._MEIPASS` first (when set), falling back to the `sys.executable`-parent check in case this is ever built `--onedir` instead.
+
+**Verified, not just implemented this time:** rebuilt the `.exe`, launched it, and while it was running, inspected its live `_MEI*` extraction directory under `%TEMP%` directly. `chrome.exe` genuinely exists at `<extraction dir>/ms-playwright/chromium-1243/chrome-win64/chrome.exe` -- the exact path the fixed code now points `PLAYWRIGHT_BROWSERS_PATH` at. This confirms the fix resolves the specific error Huzaifah hit, though the actual "Setup Checker Account" login flow (a visible Chromium window opening for manual login) still was not click-tested end-to-end, since this session has no way to drive the GUI's mouse/keyboard -- only to inspect files and processes.
+
+### 6.4 What this session still could not do
+
+- **None of the above was re-verified against the live site.** The defaults were raised based on live evidence (this is no longer purely speculative like the `fix/concurrent-timeouts` branch), but nobody has re-run the same batches with the new GUI timeout fields and confirmed the failure rate actually drops.
+- **The "October 2025" question is open**, not resolved — `debug_dump` makes it answerable, but answering it needs one more live run with the checkbox on and someone reading the resulting files in `debug/`.
+- **The `_safe_click` SVG-click-hang fix (#2) is untested against the real Threads DOM** — the unit tests confirm the 3-stage fallback logic itself works, not that it actually resolves the real click target Playwright was struggling with live.
+
+### 6.5 Round 2 verification (2026-10-10, `fix/data-accuracy-and-nfr1-verification`): working-session gate failed
+
+Pulled `fix/live-test-findings` (already up to date) and branched as directed. Cookie preflight reported connected, but the approved live 10-account Combined/1-worker CLI run returned no transparency fields for any account (`10 accounts in 193.8s`, 10 IG Options errors, nine Threads About-option errors and one Threads menu error). No raw dialogs were captured. A subsequent same-profile live screenshot and visible-text capture showed Log In / Sign Up, confirming the observed page was unauthenticated despite the cookie metadata. Stopped further live work: neither October 2025 hypothesis is resolved and the 100-account benchmark was not run. No application code changed. Full pytest retry outside the sandbox: `81 passed in 4.19s`; original sandbox failures are retained in the new [running test log](test_log.md). Dedicated reports cover [data accuracy and local evidence](implementation/TSK-402-data-accuracy.md), [the gated benchmark](implementation/TSK-401-nfr1-benchmark.md), and [verification methods and alternatives](implementation/round2-verification-process.md). Manual checker re-authentication is needed before resuming; no packaged-executable automation or Huzaifah-driven GUI run occurred in this round.
+
+### 6.6 Setup window visibility follow-up (2026-10-10)
+
+Huzaifah launched `python main.py` and clicked Setup, then reported no visible browser. Live process/window inspection found the app-owned Chromium window titled Instagram, handle 67942. Restored that existing window and checked that it became the foreground window (`ForegroundRequest=True`, `ForegroundMatches=True`). No source fix or profile reset was needed; authentication remains for the user to complete. See [the dedicated diagnostic](implementation/checker-login-window-visibility.md) and the new live-GUI observation row in [test_log.md](test_log.md).
+
+### 6.7 User-run batch and five-checker assessment (2026-10-10)
+
+Huzaifah supplied two screenshots of a 95-account Combined/5-worker run with debug off. The final screen shows 27 returned in displayed 3m 00s, 26 ACTIVE/1 BLOCKED, stopped on a checker challenge while the header still says Connected. Across both screenshots, 13 rows have IG country/date (11 October 2025 and two November 2025), 14 lack both, and all 27 lack Threads country/date. These are user-run screenshot observations, not independently measured benchmark results. [The dedicated assessment](implementation/current-failures-and-checker-pool.md) lists observed failures, code-review risks, the unresolved date hypotheses (including genuinely similar account creation dates), and a proposed five-profile checker design with alternatives. No application code or new live requests were made; a checker pool remains unimplemented and unverified.
+
+### 6.8 Source audit and corrected same-account comparison (2026-10-10)
+
+Huzaifah requested all source checked and problems kept in one file. Created [problem_log.md](problem_log.md) with stable P01–P30 entries and evidence states. The initial alleged country/date mismatch compared brenna1074 (April 2016, country absent) with brenda_1074 (China / October 2025); the corrected same-account browser screenshot explicitly matches the app's China / October 2025. No date-parser change was justified by that comparison. Reviewed the runtime path and statically inventoried all 57 existing Python files (16 production, 37 legacy, four tests); local synthetic Chromium and pure-code checks reproduced 12 observation groups, including hidden/unrelated-dialog acceptance, incomplete polling, malformed label-as-value, wrong menu targeting and false ACTIVE classification. These are proven local risks, not a claim they caused the actual matching October value. Full suite: `81 passed in 1.86s`. No application source or live checker state changed. [Audit method and alternatives](implementation/source-audit-and-problem-log.md), [reproduction output](implementation/evidence/audit-reproductions.txt) and [running test log](test_log.md) retain the evidence.
+
+
+### 2026-10-10 ? Independent checker pool implementation
+
+The user authorized categorizing and implementing the audit findings and accepted
+manual verification where required. Added five isolated saved profiles, official
+IG/Threads login tabs, a shared queue, per-checker attribution and global challenge
+stop. Scheduler regressions exercise five contexts and 21 unique targets; live
+five-account operation is not yet established. Details and rejected alternatives:
+[isolated-checker-pool.md](implementation/isolated-checker-pool.md).
+
+### 2026-10-10 ? Transparency/session hardening and exact Threads diagnosis
+
+The original live Threads capture showed a login wall despite an About-menu error.
+New preflight now reports Threads login required before work (23.2s); an initial
+CSP-incompatible readiness check was corrected and rechecked live. Hidden/wrong-user
+dialogs, adjacent labels, delayed fields, generic-error classification, input
+validation and stop-between-platform behavior now have regression coverage. A new
+IG-only run still failed to open About (25.3s total), so successful live extraction
+is not claimed. User confirmed both logins complete; post-login agent runs were
+blocked by approval-review timeouts and a captured manual run was requested.
+[transparency-and-session-hardening.md](implementation/transparency-and-session-hardening.md).
+
+### 2026-10-10 ? Result evidence and durable data paths
+
+Added Data quality, checker ID, full row details, immediate local JSONL persistence
+and opt-in screenshots/text/stage metadata. Source paths preserve the original
+checker session; frozen data paths use LOCALAPPDATA. No executable rebuild or
+restart acceptance was performed. README no longer advertises unverified throughput
+or absent export/history features. See [result-evidence-and-stable-storage.md](implementation/result-evidence-and-stable-storage.md)
+and [manual_verification.md](manual_verification.md). Full test execution history,
+including Tcl initialization failures and permission-review timeouts, is retained
+in test_log.md; do not count those as a green full suite.
+
+
+### 2026-10-10 - Live disclosure follow-up and final suite
+
+After the operator completed both logins, an agent-operated Combined run read both
+About panels for brenda_1074 in 17.1s total / 8.36s row. Actual IG data was China /
+October 2025; Threads was October 2025 / 100M+ / Not shared. The Not shared value
+revealed a completeness defect, now fixed while preserving the exact source text;
+see [threads-disclosure-quality.md](implementation/threads-disclosure-quality.md).
+The following live recheck failed earlier during page/menu loading (62.0s total),
+so repeated live reliability remains open. Both controlled 10-target launch
+attempts timed out in automatic approval review before running. Final full suite
+passed outside the sandbox: **113 passed in 13.51s**, zero skips. The central
+problem log and task reports distinguish successful single-account transcription,
+remaining batch accuracy/performance work, and release packaging limitations.
+
+### 2026-10-10 - Account-file automatic setup
+
+The operator confirmed the five supplied rows contain permanent authenticator
+secrets. Added **Import accounts & auto-login**, strict pipe-separated parsing,
+local RFC 6238 codes, sequential IG/Threads setup and stable username-bound
+profiles. Only usernames/selections persist in app settings; password/seed
+values never enter status, diagnostics or exception text. Challenges and email/
+SMS steps stop setup for manual completion; existing sessions are reused on
+reimport. Imported identity is rechecked at extraction preflight. Full automated
+suite initially passed 151 tests; final suite after live-layout and identity
+hardening: **153 passed in 26.68s**, zero skips. Live inspection identified IG's
+`name=email` / `autocomplete=username webauthn` form; fixing its selector enabled
+the first imported account's IG login. Threads submitted one authenticator code
+but remained unverified; fresh read-only inspection confirmed no session cookie.
+Setup stopped before the other four accounts. P36 remains open for manual
+completion/diagnosis, and all five dual-platform logins are not claimed.
+See [account-file-auto-login.md](implementation/account-file-auto-login.md) and
+[manual_verification.md](manual_verification.md); P33-P36 track this work.
+
+### 2026-10-10 - Authenticator Code screen follow-up
+
+The operator requested automatic completion of the pictured authentication-app
+Code prompt. Added label/ARIA/approvals_code and autocomplete-token field support,
+form/dialog-scoped submit selection, and a bounded return to Threads when its IG
+authentication handoff ends at Instagram. Codes still come from the imported seed
+locally and are submitted at most once; no secret logging was added. **159 tests
+passed in 35.94s**, including below-fold Code/Continue controls and handoff fixtures.
+Live validation is pending browser closure; the screenshot provides visible text,
+not DOM attributes. P37 tracks the fix; P36 is not declared live-resolved.
+See [authenticator-code-form.md](implementation/authenticator-code-form.md).
+
+### 2026-10-12 - Round 3 resilience and actual account health
+
+Pulled the prior fix branch and created `fix/resilience-and-root-cause` as
+explicitly directed. Failed startup/setup slots now yield to healthy selected
+checkers; platform and target exceptions retain error records and continue other
+work. Mid-run session challenge still triggers the global fail-safe. Unstarted
+targets are recorded separately. Full suite: **170 passed in 40.00s**, zero skips.
+
+All five imported checkers were genuinely attempted: IG 1/5 (checker_5), Threads
+0/5, dual-platform 0/5. Checker_2's own live suspension notice states October 9,
+2026 and account integrity; no automation causation is inferred. Checker_1/3
+also reach suspension/verification routes. Checker_4/5 reach Threads onboarding
+and subsequently a broken-home page; cookie presence does not prove a usable
+session. Exact continuation-button mismatch and health-route classification were
+fixed with regressions, but a fresh healthy target-menu capture and the 100-target
+benchmark are gated on restored login. The supplied list has 95 unique targets.
+See [Round 3 report](implementation/round3-report.md) and [test log](test_log.md).
+
+
+### Packaged delivery follow-up (2026-10-15)
+
+Continued feature/targeted-check-modes after committed reporting/classifier
+fixes in 8e4b066. Actual EXE inspection reproduced collapsed username input
+and clipped Start at 150 percent scaling. The left panel now scrolls; the
+final suite passed 279 tests in 69.20s. Rebuilt and actually operated the
+final EXE: 325,044,156 bytes. Setup launched the _MEI bundled Chromium and
+live-verified Checker 5 on both platforms. Anonymous 2-target run: 10.98s,
+2 Status only, no checker/error. Smart 2-target run: 12.89s, 2 Complete,
+2 Threads skips, no errors. Actual selected TSV/CSV/XLSX matched; history,
+re-copy, settings/history restart and file import worked. These small samples
+are not new 95/100-account benchmarks. No clean physical Windows machine is
+available; TSK-502 stays unchecked. PRD, task evidence, five-mode illustrated
+Quick Start and the operator checklist now match the measured delivery.
+No merge into dev, branch deletion or binary commit. See
+[BL-01 evidence and limits](implementation/bl01-packaged-verification.md).

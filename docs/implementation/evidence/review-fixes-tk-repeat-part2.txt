@@ -1,0 +1,263 @@
+E           (in namespace eval "::" script line 1)
+E           invoked from within
+E       "namespace eval :: [list source -encoding utf-8 [file join $::tk_library $file.tcl]]"
+E           (procedure "SourceLibFile" line 2)
+E           invoked from within
+E       "SourceLibFile button"
+E           (in namespace eval "::tk" script line 3)
+E           invoked from within
+E       "namespace eval ::tk {
+E       	SourceLibFile icons
+E       	SourceLibFile button
+E       	SourceLibFile entry
+E       	SourceLibFile listbox
+E       	SourceLibFile menu
+E       	SourceLibFile panedw..."
+E           (file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/tk.tcl" line 506)
+E           invoked from within
+E       "source -encoding utf-8 C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/tk.tcl"
+E           ("uplevel" body line 1)
+E           invoked from within
+E       "uplevel #0 [list source -encoding utf-8 $file]"
+E
+E
+E       This probably means that tk wasn't installed properly.
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\tkinter\__init__.py:2346: TclError
+___ ERROR at setup of test_corrupt_settings_default_and_visible_message[[]] ___
+
+tmp_path_factory = TempPathFactory(_given_basetemp=None, _trace=<pluggy._tracing.TagTracerSub object at 0x000001F48543B350>, _basetemp=WindowsPath('C:/Users/huzai/AppData/Local/Temp/pytest-of-huzai/pytest-100'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def gui_root(tmp_path_factory: pytest.TempPathFactory) -> Iterator[MetaInspectorApp]:
+        """Share one Tk interpreter across all cases in this module."""
+>       app = MetaInspectorApp(profile_dir=tmp_path_factory.mktemp("output_gui") / "profile")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_output_selection.py:24:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\gui\app.py:47: in __init__
+    super().__init__(fg_color=theme.BG_DARK)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\customtkinter\windows\ctk_tk.py:40: in __init__
+    CTK_PARENT_CLASS.__init__(self, **pop_from_dict_by_set(kwargs, self._valid_tk_constructor_arguments))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <src.gui.app.MetaInspectorApp object .>, screenName = None
+baseName = '__main__', className = 'Tk', useTk = True, sync = False, use = None
+
+    def __init__(self, screenName=None, baseName=None, className='Tk',
+                 useTk=True, sync=False, use=None):
+        """Return a new top level widget on screen SCREENNAME. A new Tcl interpreter will
+        be created. BASENAME will be used for the identification of the profile file (see
+        readprofile).
+        It is constructed from sys.argv[0] without extensions if None is given. CLASSNAME
+        is the name of the widget class."""
+        self.master = None
+        self.children = {}
+        self._tkloaded = False
+        # to avoid recursions in the getattr code in case of failure, we
+        # ensure that self.tk is always _something_.
+        self.tk = None
+        if baseName is None:
+            import os
+            baseName = os.path.basename(sys.argv[0])
+            baseName, ext = os.path.splitext(baseName)
+            if ext not in ('.py', '.pyc'):
+                baseName = baseName + ext
+        interactive = False
+>       self.tk = _tkinter.create(screenName, baseName, className, interactive, wantobjects, useTk, sync, use)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       _tkinter.TclError: Can't find a usable tk.tcl in the following directories:
+E           C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tcl8.6/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/lib/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/lib/tk8.6 C:/Users/huzai/AppData/Local/Programs/lib/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/library
+E
+E       C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/tk.tcl: couldn't read file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/button.tcl": no such file or directory
+E       couldn't read file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/button.tcl": no such file or directory
+E           while executing
+E       "source -encoding utf-8 C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/button.tcl"
+E           (in namespace eval "::" script line 1)
+E           invoked from within
+E       "namespace eval :: [list source -encoding utf-8 [file join $::tk_library $file.tcl]]"
+E           (procedure "SourceLibFile" line 2)
+E           invoked from within
+E       "SourceLibFile button"
+E           (in namespace eval "::tk" script line 3)
+E           invoked from within
+E       "namespace eval ::tk {
+E       	SourceLibFile icons
+E       	SourceLibFile button
+E       	SourceLibFile entry
+E       	SourceLibFile listbox
+E       	SourceLibFile menu
+E       	SourceLibFile panedw..."
+E           (file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/tk.tcl" line 506)
+E           invoked from within
+E       "source -encoding utf-8 C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/tk.tcl"
+E           ("uplevel" body line 1)
+E           invoked from within
+E       "uplevel #0 [list source -encoding utf-8 $file]"
+E
+E
+E       This probably means that tk wasn't installed properly.
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\tkinter\__init__.py:2346: TclError
+_ ERROR at setup of test_corrupt_settings_default_and_visible_message[\ufffd] _
+
+tmp_path_factory = TempPathFactory(_given_basetemp=None, _trace=<pluggy._tracing.TagTracerSub object at 0x000001F48543B350>, _basetemp=WindowsPath('C:/Users/huzai/AppData/Local/Temp/pytest-of-huzai/pytest-100'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def gui_root(tmp_path_factory: pytest.TempPathFactory) -> Iterator[MetaInspectorApp]:
+        """Share one Tk interpreter across all cases in this module."""
+>       app = MetaInspectorApp(profile_dir=tmp_path_factory.mktemp("output_gui") / "profile")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_output_selection.py:24:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\gui\app.py:47: in __init__
+    super().__init__(fg_color=theme.BG_DARK)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\customtkinter\windows\ctk_tk.py:40: in __init__
+    CTK_PARENT_CLASS.__init__(self, **pop_from_dict_by_set(kwargs, self._valid_tk_constructor_arguments))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <src.gui.app.MetaInspectorApp object .>, screenName = None
+baseName = '__main__', className = 'Tk', useTk = True, sync = False, use = None
+
+    def __init__(self, screenName=None, baseName=None, className='Tk',
+                 useTk=True, sync=False, use=None):
+        """Return a new top level widget on screen SCREENNAME. A new Tcl interpreter will
+        be created. BASENAME will be used for the identification of the profile file (see
+        readprofile).
+        It is constructed from sys.argv[0] without extensions if None is given. CLASSNAME
+        is the name of the widget class."""
+        self.master = None
+        self.children = {}
+        self._tkloaded = False
+        # to avoid recursions in the getattr code in case of failure, we
+        # ensure that self.tk is always _something_.
+        self.tk = None
+        if baseName is None:
+            import os
+            baseName = os.path.basename(sys.argv[0])
+            baseName, ext = os.path.splitext(baseName)
+            if ext not in ('.py', '.pyc'):
+                baseName = baseName + ext
+        interactive = False
+>       self.tk = _tkinter.create(screenName, baseName, className, interactive, wantobjects, useTk, sync, use)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       _tkinter.TclError: Can't find a usable tk.tcl in the following directories:
+E           C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tcl8.6/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/lib/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/lib/tk8.6 C:/Users/huzai/AppData/Local/Programs/lib/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/library
+E
+E       C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/tk.tcl: couldn't read file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/button.tcl": no such file or directory
+E       couldn't read file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/button.tcl": no such file or directory
+E           while executing
+E       "source -encoding utf-8 C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/button.tcl"
+E           (in namespace eval "::" script line 1)
+E           invoked from within
+E       "namespace eval :: [list source -encoding utf-8 [file join $::tk_library $file.tcl]]"
+E           (procedure "SourceLibFile" line 2)
+E           invoked from within
+E       "SourceLibFile button"
+E           (in namespace eval "::tk" script line 3)
+E           invoked from within
+E       "namespace eval ::tk {
+E       	SourceLibFile icons
+E       	SourceLibFile button
+E       	SourceLibFile entry
+E       	SourceLibFile listbox
+E       	SourceLibFile menu
+E       	SourceLibFile panedw..."
+E           (file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/tk.tcl" line 506)
+E           invoked from within
+E       "source -encoding utf-8 C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/tk.tcl"
+E           ("uplevel" body line 1)
+E           invoked from within
+E       "uplevel #0 [list source -encoding utf-8 $file]"
+E
+E
+E       This probably means that tk wasn't installed properly.
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\tkinter\__init__.py:2346: TclError
+___________ ERROR at setup of test_real_history_and_platform_scope ____________
+
+tmp_path_factory = TempPathFactory(_given_basetemp=None, _trace=<pluggy._tracing.TagTracerSub object at 0x000001F48543B350>, _basetemp=WindowsPath('C:/Users/huzai/AppData/Local/Temp/pytest-of-huzai/pytest-100'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def gui_root(tmp_path_factory: pytest.TempPathFactory) -> Iterator[MetaInspectorApp]:
+        """Share one Tk interpreter across all cases in this module."""
+>       app = MetaInspectorApp(profile_dir=tmp_path_factory.mktemp("output_gui") / "profile")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_output_selection.py:24:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\gui\app.py:47: in __init__
+    super().__init__(fg_color=theme.BG_DARK)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\customtkinter\windows\ctk_tk.py:40: in __init__
+    CTK_PARENT_CLASS.__init__(self, **pop_from_dict_by_set(kwargs, self._valid_tk_constructor_arguments))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <src.gui.app.MetaInspectorApp object .>, screenName = None
+baseName = '__main__', className = 'Tk', useTk = True, sync = False, use = None
+
+    def __init__(self, screenName=None, baseName=None, className='Tk',
+                 useTk=True, sync=False, use=None):
+        """Return a new top level widget on screen SCREENNAME. A new Tcl interpreter will
+        be created. BASENAME will be used for the identification of the profile file (see
+        readprofile).
+        It is constructed from sys.argv[0] without extensions if None is given. CLASSNAME
+        is the name of the widget class."""
+        self.master = None
+        self.children = {}
+        self._tkloaded = False
+        # to avoid recursions in the getattr code in case of failure, we
+        # ensure that self.tk is always _something_.
+        self.tk = None
+        if baseName is None:
+            import os
+            baseName = os.path.basename(sys.argv[0])
+            baseName, ext = os.path.splitext(baseName)
+            if ext not in ('.py', '.pyc'):
+                baseName = baseName + ext
+        interactive = False
+>       self.tk = _tkinter.create(screenName, baseName, className, interactive, wantobjects, useTk, sync, use)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       _tkinter.TclError: Can't find a usable tk.tcl in the following directories:
+E           C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tcl8.6/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/lib/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/lib/tk8.6 C:/Users/huzai/AppData/Local/Programs/lib/tk8.6 C:/Users/huzai/AppData/Local/Programs/Python/library
+E
+E       C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/tk.tcl: couldn't read file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/button.tcl": no such file or directory
+E       couldn't read file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/button.tcl": no such file or directory
+E           while executing
+E       "source -encoding utf-8 C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/button.tcl"
+E           (in namespace eval "::" script line 1)
+E           invoked from within
+E       "namespace eval :: [list source -encoding utf-8 [file join $::tk_library $file.tcl]]"
+E           (procedure "SourceLibFile" line 2)
+E           invoked from within
+E       "SourceLibFile button"
+E           (in namespace eval "::tk" script line 3)
+E           invoked from within
+E       "namespace eval ::tk {
+E       	SourceLibFile icons
+E       	SourceLibFile button
+E       	SourceLibFile entry
+E       	SourceLibFile listbox
+E       	SourceLibFile menu
+E       	SourceLibFile panedw..."
+E           (file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/tk.tcl" line 506)
+E           invoked from within
+E       "source -encoding utf-8 C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tk8.6/tk.tcl"
+E           ("uplevel" body line 1)
+E           invoked from within
+E       "uplevel #0 [list source -encoding utf-8 $file]"
+E
+E
+E       This probably means that tk wasn't installed properly.
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\tkinter\__init__.py:2346: TclError
+=========================== short test summary info ===========================
+ERROR tests/test_output_selection.py::test_real_popup_drives_clipboard_csv_excel_and_persists
+ERROR tests/test_output_selection.py::test_corrupt_settings_default_and_visible_message[{broken]
+ERROR tests/test_output_selection.py::test_corrupt_settings_default_and_visible_message[{"columns":["invalid"]}]
+ERROR tests/test_output_selection.py::test_corrupt_settings_default_and_visible_message[{"columns":[{}]}]
+ERROR tests/test_output_selection.py::test_corrupt_settings_default_and_visible_message[[]]
+ERROR tests/test_output_selection.py::test_corrupt_settings_default_and_visible_message[\ufffd]
+ERROR tests/test_output_selection.py::test_real_history_and_platform_scope - ...
+17 passed, 7 errors in 14.52s

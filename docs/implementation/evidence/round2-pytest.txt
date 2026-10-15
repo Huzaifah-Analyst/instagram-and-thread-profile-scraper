@@ -1,0 +1,74 @@
+﻿Excerpt of sandbox pytest output. Full local output: debug/round2-pytest-sandbox-full.txt
+Command: python -m pytest -ra
+Exit code: 1
+
+    result = call_fixture_func(fixturefunc, request, kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\fixtures.py:998: in call_fixture_func
+    fixture_result = next(generator)
+                     ^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\tmpdir.py:300: in tmp_path
+    path = _mk_tmp(request, tmp_path_factory)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\tmpdir.py:287: in _mk_tmp
+    return factory.mktemp(name, numbered=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\tmpdir.py:136: in mktemp
+    basename = self._ensure_relative_to_basetemp(basename)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\tmpdir.py:117: in _ensure_relative_to_basetemp
+    if (self.getbasetemp() / basename).resolve().parent != self.getbasetemp():
+        ^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\tmpdir.py:213: in getbasetemp
+    basetemp = make_numbered_dir_with_cleanup(
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\pathlib.py:420: in make_numbered_dir_with_cleanup
+    raise e
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\pathlib.py:401: in make_numbered_dir_with_cleanup
+    p = make_numbered_dir(root, prefix, mode)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\pathlib.py:228: in make_numbered_dir
+    max_existing = max(map(parse_num, find_suffixes(root, prefix)), default=-1)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\pathlib.py:187: in extract_suffixes
+    for entry in iter:
+                 ^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+root = WindowsPath('C:/Users/huzai/AppData/Local/Temp/pytest-of-huzai')
+prefix = 'pytest-'
+
+    def find_prefixed(root: Path, prefix: str) -> Iterator[os.DirEntry[str]]:
+        """Find all elements in root that begin with the prefix, case-insensitive."""
+        l_prefix = prefix.lower()
+>       for x in os.scandir(root):
+                 ^^^^^^^^^^^^^^^^
+E       PermissionError: [WinError 5] Access is denied: 'C:\\Users\\huzai\\AppData\\Local\\Temp\\pytest-of-huzai'
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\pathlib.py:175: PermissionError
+============================== warnings summary ===============================
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\cacheprovider.py:469
+  C:\Users\huzai\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\cacheprovider.py:469: PytestCacheWarning: cache could not write path C:\Users\huzai\Downloads\alizakhan\.pytest_cache\v\cache\nodeids: [Errno 13] Permission denied: 'C:\\Users\\huzai\\Downloads\\alizakhan\\.pytest_cache\\v\\cache\\nodeids'
+    config.cache.set("cache/nodeids", sorted(self.cached_nodeids))
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\cacheprovider.py:423
+  C:\Users\huzai\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\cacheprovider.py:423: PytestCacheWarning: could not create cache path C:\Users\huzai\Downloads\alizakhan\.pytest_cache\v\cache\lastfailed: [WinError 5] Access is denied: 'C:\\Users\\huzai\\Downloads\\alizakhan\\.pytest_cache\\v\\cache'
+    config.cache.set("cache/lastfailed", self.lastfailed)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+ERROR tests/test_core_helpers.py::test_scraper_defaults_match_extractor_timeouts
+ERROR tests/test_core_helpers.py::test_scraper_timeouts_are_configurable_without_a_code_change
+ERROR tests/test_core_helpers.py::test_scraper_debug_dump_defaults_off_and_is_configurable
+ERROR tests/test_core_helpers.py::test_check_account_passes_timeouts_and_debug_dump_to_extractors
+ERROR tests/test_core_helpers.py::test_worker_stops_immediately_when_session_is_blocked
+ERROR tests/test_extractor_edge_cases.py::test_write_debug_dump_writes_a_file
+ERROR tests/test_extractor_edge_cases.py::test_write_debug_dump_does_nothing_for_empty_texts
+ERROR tests/test_gui_bridge.py::test_scraper_pause_resume_and_stop_flags - Pe...
+ERROR tests/test_gui_bridge.py::test_stop_before_run_is_not_lost - Permission...
+ERROR tests/test_gui_bridge.py::test_session_missing_profile - PermissionErro...
+ERROR tests/test_gui_bridge.py::test_session_connected - PermissionError: [Wi...
+ERROR tests/test_gui_bridge.py::test_session_expired_or_absent - PermissionEr...
+ERROR tests/test_gui_bridge.py::test_gui_worker_count_is_not_hardcoded - Perm...
+ERROR tests/test_gui_bridge.py::test_gui_dialog_menu_timeout_and_debug_dump_are_not_hardcoded
+ERROR tests/test_gui_bridge.py::test_app_runs_a_fake_check_end_to_end - Permi...
+================== 66 passed, 2 warnings, 15 errors in 7.64s ==================

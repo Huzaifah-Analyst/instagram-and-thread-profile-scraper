@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import queue
 import threading
 from pathlib import Path
 from typing import Callable, Optional
@@ -11,17 +12,21 @@ from typing import Callable, Optional
 import customtkinter as ctk
 
 from src.core.scraper import MODE_COMBINED, MODE_IG_ONLY, MultiWorkerScraper, login_session
-from src.core.session import SESSION_CONNECTED, SESSION_UNKNOWN, check_session
+from src.core.modes import MODE_IG_STATUS_ONLY, MODE_COMBINED_SMART, STATUS_ONLY_NOTICE
+from src.core.session import SESSION_CONNECTED, check_session
+from src.core.checkers import Checker, CheckerStore
+from src.core.credentials import AccountCredential
+from src.core.auto_login import login_accounts
+from src.core.paths import DEFAULT_PROFILE_DIR
 from src.gui import theme
 from src.gui.bridge import ErrorEvent, FinishedEvent, ProgressEvent, RunState, ScraperBridge, ScraperFactory
 from src.gui.components.data_table import DataTable
 from src.gui.components.left_panel import LeftPanel
-from src.gui.components.status_bar import StatusBar
+from src.gui.output_actions import OutputActions
+from src.gui.components.checker_dialog import CheckerDialog
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_PROFILE_DIR = PROJECT_ROOT / "browser_profile"
 POLL_INTERVAL_MS = 100
 MODE_NAMES = {MODE_COMBINED: "Combined", MODE_IG_ONLY: "Instagram Only"}
 
@@ -47,19 +52,27 @@ class MetaInspectorApp(ctk.CTk):
         self.grid_rowconfigure(1, weight=1)
 
         self.profile_dir = profile_dir
+        self.checker_store = CheckerStore(profile_dir)
+        self._session_invalid = False
+        self._active_login: Optional[Checker] = None
+        self._checker_dialog: Optional[CheckerDialog] = None
         self.bridge = ScraperBridge(scraper_factory or self._default_factory)
         self._login_thread: Optional[threading.Thread] = None
         self._login_error: Optional[str] = None
+        self._login_updates: queue.Queue[str] = queue.Queue()
+        self._login_cancel = threading.Event()
+        self._login_summary: Optional[str] = None
         self._total = 0
         self._done = 0
 
         self._build_header()
         self.left_panel = LeftPanel(self, on_start=self._on_start, on_pause_toggle=self._on_pause_toggle,
-                                    on_stop=self._on_stop)
+                                    on_stop=self._on_stop, on_mode_changed=self._on_mode_changed)
         self.left_panel.grid(row=1, column=0, sticky="nsw")
         self.table = DataTable(self)
         self.table.grid(row=1, column=1, sticky="nsew", padx=14, pady=14)
-        self.status_bar = StatusBar(self)
+        self.output_actions = OutputActions(self, self.table, self.checker_store.path.parent)
+        self.status_bar = self.output_actions.bar
         self.status_bar.grid(row=2, column=0, columnspan=2, sticky="ew")
 
         self._refresh_session()
@@ -84,29 +97,66 @@ class MetaInspectorApp(ctk.CTk):
                                           fg_color=theme.BG_ELEVATED, hover_color=theme.BORDER_COLOR,
                                           border_color=theme.BORDER_COLOR, border_width=1, font=theme.FONT_BODY)
         self.setup_button.grid(row=0, column=2, padx=16, pady=12)
+        self.manage_button = ctk.CTkButton(
+            header, text="Manage checkers", command=self._open_checker_manager,
+            fg_color=theme.BG_ELEVATED,
+        )
+        self.manage_button.grid(row=0, column=3, padx=8, pady=12)
 
     def _default_factory(self, mode: str, callback: Callable[[int, int, dict], None]) -> MultiWorkerScraper:
-        """Creates the production scraper for one run."""
-        return MultiWorkerScraper(profile_dir=self.profile_dir, mode=mode, headless=True,
-                                  progress_callback=callback)
+        """Creates the production scraper for one run, using the panel's worker/timeout settings."""
+        return MultiWorkerScraper(
+            profile_dir=self.profile_dir, mode=mode, headless=True, workers=self.left_panel.workers,
+            dialog_timeout_s=self.left_panel.dialog_timeout_s,
+            menu_click_timeout_s=self.left_panel.menu_click_timeout_s,
+            debug_dump=self.left_panel.debug_dump, progress_callback=callback,
+            checkers=([] if mode == MODE_IG_STATUS_ONLY else
+                      [slot for slot in self.checker_store.load() if slot.enabled]),
+            persist_results=True,
+        )
 
     # ------------------------------------------------------------------ #
     # Controls
     # ------------------------------------------------------------------ #
 
+    def _on_mode_changed(self) -> None:
+        """Explain intentional scope limitations before a run starts."""
+        if self.left_panel.mode == MODE_IG_STATUS_ONLY:
+            self.status_bar.message(STATUS_ONLY_NOTICE)
+        elif self.left_panel.mode == MODE_COMBINED_SMART:
+            self.status_bar.message("Threads is skipped when Instagram supplies a country.")
+        else:
+            self.status_bar.message("Ready. Paste usernames and press Start.")
+        self._refresh_session()
+        self._apply_state()
+
     def _on_start(self) -> None:
         """Validates input and starts a run."""
-        usernames = self.left_panel.usernames()
+        try:
+            usernames = self.left_panel.usernames()
+            self.left_panel.validate_timeouts()
+        except ValueError as exc:
+            self.status_bar.message(str(exc), "error")
+            return
         if not usernames:
             self.status_bar.message("Paste at least one username first.", "warn")
             return
         self.table.clear()
+        self.status_bar.set_results_available(False)
         self._total, self._done = len(usernames), 0
         self.status_bar.set_progress(0, self._total)
         self.status_bar.set_timing(0, None)
         mode = self.left_panel.mode
-        self.bridge.start(usernames, mode)
-        self.status_bar.message(f"Checking {self._total} accounts ({MODE_NAMES.get(mode, 'Threads Only')})...")
+        self._run_mode = mode
+        try:
+            self.bridge.start(usernames, mode)
+        except (OSError, ValueError) as exc:
+            self.status_bar.message(str(exc), "error")
+            return
+        self.status_bar.message(
+            STATUS_ONLY_NOTICE if mode == MODE_IG_STATUS_ONLY else
+            "Verifying selected checker logins, then checking targets..."
+        )
         self._apply_state()
 
     def _on_pause_toggle(self) -> None:
@@ -126,19 +176,78 @@ class MetaInspectorApp(ctk.CTk):
         self._apply_state()
 
     def _on_setup(self) -> None:
-        """Opens a visible browser for one-time checker login (TSK-205)."""
+        """Start sequential setup directly when exactly one checker is selected."""
         if self.bridge.state is not RunState.IDLE or self._login_running:
             return
+        try:
+            selected = [slot for slot in self.checker_store.load() if slot.enabled]
+            if len(selected) == 1:
+                self._start_login(selected[0])
+            else:
+                self._open_checker_manager()
+        except (OSError, ValueError) as exc:
+            self.status_bar.message(f"Checker settings: {exc}", "error")
+
+    def _open_checker_manager(self) -> None:
+        """Open the optional multi-account manager without starting logins."""
+        if self.bridge.state is not RunState.IDLE or self._login_running:
+            return
+        if self._checker_dialog is not None and self._checker_dialog.winfo_exists():
+            self._checker_dialog.lift()
+            return
+        try:
+            self._checker_dialog = CheckerDialog(
+                self, self.checker_store, self._start_login, self._refresh_session,
+                on_import=self._start_import_login,
+            )
+        except (OSError, ValueError) as exc:
+            self.status_bar.message(f"Checker settings: {exc}", "error")
+
+    def _start_login(self, checker: Checker) -> None:
+        """Open this slot's sequential manual login windows in a background thread."""
+        if self.bridge.state is not RunState.IDLE or self._login_running:
+            return
+        self._active_login = checker
+        self._login_cancel.clear()
         self._login_error = None
+        self._login_summary = None
         self._login_thread = threading.Thread(target=self._login_worker, name="checker-login", daemon=True)
         self._login_thread.start()
-        self.status_bar.message("Log in with the checker account in the browser window, then close it.", "warn")
+        self.status_bar.message(f"{checker.checker_id}: log in to Instagram and close its window; Threads opens next.", "warn")
         self._apply_state()
+
+    def _start_import_login(self, accounts: list[AccountCredential], checkers: list[Checker]) -> None:
+        """Keep imported secrets only in the worker's argument lifetime."""
+        if self.bridge.state is not RunState.IDLE or self._login_running:
+            return
+        self._login_error = self._login_summary = None
+        self._login_cancel.clear()
+        self._login_thread = threading.Thread(
+            target=self._import_login_worker, args=(accounts, checkers),
+            name="checker-import-login", daemon=True,
+        )
+        self._login_thread.start()
+        self.status_bar.message("Setting up imported accounts. Follow any manual prompts in the browser.")
+        self._apply_state()
+
+    def _import_login_worker(self, accounts: list[AccountCredential], checkers: list[Checker]) -> None:
+        """Forward only sanitized login progress to the Tk thread."""
+        try:
+            self._login_summary = asyncio.run(login_accounts(
+                accounts, checkers, self._login_cancel, self._login_updates.put,
+            ))
+        except Exception:  # Secret-bearing browser exceptions must not reach logs.
+            self._login_error = "Account login failed. Close the setup browser and retry."
 
     def _login_worker(self) -> None:
         """Background thread: runs the login browser until the user closes it."""
         try:
-            asyncio.run(login_session(self.profile_dir))
+            profile = self._active_login.profile_dir if self._active_login else self.profile_dir
+            self._login_summary = asyncio.run(login_session(
+                profile,
+                expected_username=self._active_login.username if self._active_login else None,
+                progress=self._login_updates.put, cancel=self._login_cancel,
+            ))
         except Exception as exc:  # noqa: BLE001 - thread boundary: report to the UI
             logger.exception("Login browser failed")
             self._login_error = str(exc).splitlines()[0] if str(exc) else type(exc).__name__
@@ -154,10 +263,16 @@ class MetaInspectorApp(ctk.CTk):
 
     def _poll(self) -> None:
         """Drains bridge events and refreshes timers (runs every 100 ms)."""
+        while True:
+            try:
+                self.status_bar.message(self._login_updates.get_nowait(), "warn")
+            except queue.Empty:
+                break
         for event in self.bridge.poll():
             if isinstance(event, ProgressEvent):
                 self._done = event.done
                 self.table.add_record(event.record)
+                self.status_bar.set_results_available(True)
                 self.status_bar.set_progress(event.done, event.total)
             elif isinstance(event, FinishedEvent):
                 self._on_finished(event)
@@ -174,47 +289,91 @@ class MetaInspectorApp(ctk.CTk):
             if self._login_error:
                 self.status_bar.message(f"Login browser failed: {self._login_error}", "error")
             else:
-                self.status_bar.message("Login window closed.")
+                self._session_invalid = False
+                summary = self._login_summary or "Login window closed. Start will verify both selected platforms live."
+                self.status_bar.message(summary.splitlines()[0])
+                if "\n" in summary:
+                    self._show_setup_summary(summary)
             self._refresh_session()
             self._apply_state()
 
         self.after(POLL_INTERVAL_MS, self._poll)
+
+    def _show_setup_summary(self, summary: str) -> None:
+        """Keep each checker's outcome readable beyond the single-line status bar."""
+        window = ctk.CTkToplevel(self)
+        window.title("Checker setup results")
+        window.geometry("780x400")
+        window.transient(self)
+        details = ctk.CTkTextbox(window, wrap="word")
+        details.pack(fill="both", expand=True, padx=16, pady=16)
+        details.insert("1.0", summary)
+        details.configure(state="disabled")
 
     def _on_finished(self, event: FinishedEvent) -> None:
         """Shows the end-of-run summary."""
         self.status_bar.set_timing(event.elapsed, 0)
         checked = len(event.records)
         if event.stop_reason and "session blocked" in event.stop_reason.lower():
+            self._session_invalid = True
             self.status_bar.message(
-                f"Stopped after {checked} accounts: Meta challenged the checker account. "
-                "Use 'Setup Checker Account' to log in again.", "error")
+                f"Stopped after {checked}: {event.stop_reason}", "error")
             self._refresh_session()
         elif event.stop_reason:
             self.status_bar.message(f"{event.stop_reason}. {checked}/{self._total} accounts checked.", "warn")
         else:
             self.status_bar.message(
                 f"Done: {checked} accounts in {theme.format_duration(event.elapsed)}.", "success")
+        notices = []
+        if event.unstarted:
+            notices.append(f"{len(event.unstarted)} targets not started")
+        for checker_id, health in event.checker_health.items():
+            reasons = [reason for reason in health.values() if reason]
+            if reasons:
+                notices.append(f"{checker_id}: {'; '.join(reasons)}")
+        if event.journal_error:
+            notices.append(event.journal_error)
+        if notices:
+            self.status_bar.message(
+                f"{checked}/{self._total} checked; {len(event.active_checkers)} healthy at start. "
+                + " | ".join(notices), "warn",
+            )
+
+        self.output_actions.save_run(
+            event.records, getattr(self, "_run_mode", self.left_panel.mode),
+            self._total, event.elapsed,
+        )
+        self.status_bar.set_results_available(bool(self.table.records))
 
     def _apply_state(self) -> None:
         """Syncs button states with the bridge and login status."""
         login = self._login_running
         self.left_panel.apply_state(self.bridge.state, start_allowed=not login)
-        busy = login or self.bridge.state is not RunState.IDLE
+        busy = (login or self.bridge.state is not RunState.IDLE
+                or self.left_panel.mode == MODE_IG_STATUS_ONLY)
         self.setup_button.configure(state="disabled" if busy else "normal")
+        self.manage_button.configure(state="disabled" if busy else "normal")
 
     def _refresh_session(self) -> None:
-        """Updates the header session indicator."""
-        state, detail = check_session(self.profile_dir)
-        if state == SESSION_CONNECTED:
-            text, color = "●  Connected", theme.STATUS_ACTIVE
-        elif state == SESSION_UNKNOWN:
-            text, color = f"●  {detail}", theme.STATUS_WARN
-        else:
-            text, color = f"●  Disconnected ({detail}) — click Setup", theme.STATUS_BANNED
+        """Show saved-login presence honestly; only preflight verifies live health."""
+        if self.left_panel.mode == MODE_IG_STATUS_ONLY:
+            self._session_label.configure(text="Anonymous status checks: no login needed",
+                                          text_color=theme.TEXT_MUTED)
+            return
+        try:
+            selected = [slot for slot in self.checker_store.load() if slot.enabled]
+            saved = sum(check_session(slot.profile_dir)[0] == SESSION_CONNECTED for slot in selected)
+            text = f"{saved}/{len(selected)} IG logins saved · live check on Start"
+            color = theme.TEXT_MUTED
+        except (OSError, ValueError) as exc:
+            text, color = f"Checker settings: {exc}", theme.STATUS_WARN
+        if self._session_invalid:
+            text, color = "Checker login needs attention — open Setup", theme.STATUS_BANNED
         self._session_label.configure(text=text, text_color=color)
 
     def _on_close(self) -> None:
         """Stops any run before closing the window."""
+        self._login_cancel.set()
         if self.bridge.state is not RunState.IDLE:
             self.bridge.stop()
             self.bridge.join(timeout=10)

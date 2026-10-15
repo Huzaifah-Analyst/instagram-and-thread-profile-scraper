@@ -1,0 +1,208 @@
+........................................................................ [ 64%]
+.....................EEEE..............                                  [100%]
+=================================== ERRORS ====================================
+__________ ERROR at setup of test_gui_worker_count_is_not_hardcoded ___________
+
+tmp_path_factory = TempPathFactory(_given_basetemp=WindowsPath('C:/Users/huzai/Downloads/alizakhan/.pytest-local-temp-2'), _trace=<pluggy...mp=WindowsPath('C:/Users/huzai/Downloads/alizakhan/.pytest-local-temp-2'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def gui_root(tmp_path_factory: pytest.TempPathFactory) -> Iterator[MetaInspectorApp]:
+        """Use one Tk root per process, matching the application's real lifetime."""
+>       app = MetaInspectorApp(profile_dir=tmp_path_factory.mktemp("gui") / "browser_profile")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_gui_bridge.py:261:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\gui\app.py:43: in __init__
+    super().__init__(fg_color=theme.BG_DARK)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\customtkinter\windows\ctk_tk.py:40: in __init__
+    CTK_PARENT_CLASS.__init__(self, **pop_from_dict_by_set(kwargs, self._valid_tk_constructor_arguments))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <src.gui.app.MetaInspectorApp object .>, screenName = None
+baseName = '__main__', className = 'Tk', useTk = True, sync = False, use = None
+
+    def __init__(self, screenName=None, baseName=None, className='Tk',
+                 useTk=True, sync=False, use=None):
+        """Return a new top level widget on screen SCREENNAME. A new Tcl interpreter will
+        be created. BASENAME will be used for the identification of the profile file (see
+        readprofile).
+        It is constructed from sys.argv[0] without extensions if None is given. CLASSNAME
+        is the name of the widget class."""
+        self.master = None
+        self.children = {}
+        self._tkloaded = False
+        # to avoid recursions in the getattr code in case of failure, we
+        # ensure that self.tk is always _something_.
+        self.tk = None
+        if baseName is None:
+            import os
+            baseName = os.path.basename(sys.argv[0])
+            baseName, ext = os.path.splitext(baseName)
+            if ext not in ('.py', '.pyc'):
+                baseName = baseName + ext
+        interactive = False
+>       self.tk = _tkinter.create(screenName, baseName, className, interactive, wantobjects, useTk, sync, use)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       _tkinter.TclError: Can't find a usable init.tcl in the following directories:
+E           {C:\Users\huzai\Downloads\alizakhan\.test-tcl\tcl8.6} C:/Users/huzai/AppData/Local/Programs/Python/Python312/lib/tcl8.6 C:/Users/huzai/AppData/Local/Programs/Python/lib/tcl8.6 C:/Users/huzai/AppData/Local/Programs/lib/tcl8.6 C:/Users/huzai/AppData/Local/Programs/Python/library C:/Users/huzai/AppData/Local/Programs/library C:/Users/huzai/AppData/Local/Programs/tcl8.6.15/library C:/Users/huzai/AppData/Local/tcl8.6.15/library
+E
+E
+E
+E       This probably means that Tcl wasn't installed properly.
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\tkinter\__init__.py:2346: TclError
+_ ERROR at setup of test_gui_dialog_menu_timeout_and_debug_dump_are_not_hardcoded _
+
+tmp_path_factory = TempPathFactory(_given_basetemp=WindowsPath('C:/Users/huzai/Downloads/alizakhan/.pytest-local-temp-2'), _trace=<pluggy...mp=WindowsPath('C:/Users/huzai/Downloads/alizakhan/.pytest-local-temp-2'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def gui_root(tmp_path_factory: pytest.TempPathFactory) -> Iterator[MetaInspectorApp]:
+        """Use one Tk root per process, matching the application's real lifetime."""
+>       app = MetaInspectorApp(profile_dir=tmp_path_factory.mktemp("gui") / "browser_profile")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_gui_bridge.py:261:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\gui\app.py:43: in __init__
+    super().__init__(fg_color=theme.BG_DARK)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\customtkinter\windows\ctk_tk.py:40: in __init__
+    CTK_PARENT_CLASS.__init__(self, **pop_from_dict_by_set(kwargs, self._valid_tk_constructor_arguments))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <src.gui.app.MetaInspectorApp object .>, screenName = None
+baseName = '__main__', className = 'Tk', useTk = True, sync = False, use = None
+
+    def __init__(self, screenName=None, baseName=None, className='Tk',
+                 useTk=True, sync=False, use=None):
+        """Return a new top level widget on screen SCREENNAME. A new Tcl interpreter will
+        be created. BASENAME will be used for the identification of the profile file (see
+        readprofile).
+        It is constructed from sys.argv[0] without extensions if None is given. CLASSNAME
+        is the name of the widget class."""
+        self.master = None
+        self.children = {}
+        self._tkloaded = False
+        # to avoid recursions in the getattr code in case of failure, we
+        # ensure that self.tk is always _something_.
+        self.tk = None
+        if baseName is None:
+            import os
+            baseName = os.path.basename(sys.argv[0])
+            baseName, ext = os.path.splitext(baseName)
+            if ext not in ('.py', '.pyc'):
+                baseName = baseName + ext
+        interactive = False
+>       self.tk = _tkinter.create(screenName, baseName, className, interactive, wantobjects, useTk, sync, use)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       _tkinter.TclError: Can't find a usable init.tcl in the following directories:
+E           {C:\Users\huzai\Downloads\alizakhan\.test-tcl\tcl8.6} C:/Users/huzai/AppData/Local/Programs/Python/Python312/lib/tcl8.6 C:/Users/huzai/AppData/Local/Programs/Python/lib/tcl8.6 C:/Users/huzai/AppData/Local/Programs/lib/tcl8.6 C:/Users/huzai/AppData/Local/Programs/Python/library C:/Users/huzai/AppData/Local/Programs/library C:/Users/huzai/AppData/Local/Programs/tcl8.6.15/library C:/Users/huzai/AppData/Local/tcl8.6.15/library
+E
+E
+E
+E       This probably means that Tcl wasn't installed properly.
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\tkinter\__init__.py:2346: TclError
+___________ ERROR at setup of test_app_runs_a_fake_check_end_to_end ___________
+
+tmp_path_factory = TempPathFactory(_given_basetemp=WindowsPath('C:/Users/huzai/Downloads/alizakhan/.pytest-local-temp-2'), _trace=<pluggy...mp=WindowsPath('C:/Users/huzai/Downloads/alizakhan/.pytest-local-temp-2'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def gui_root(tmp_path_factory: pytest.TempPathFactory) -> Iterator[MetaInspectorApp]:
+        """Use one Tk root per process, matching the application's real lifetime."""
+>       app = MetaInspectorApp(profile_dir=tmp_path_factory.mktemp("gui") / "browser_profile")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_gui_bridge.py:261:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\gui\app.py:43: in __init__
+    super().__init__(fg_color=theme.BG_DARK)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\customtkinter\windows\ctk_tk.py:40: in __init__
+    CTK_PARENT_CLASS.__init__(self, **pop_from_dict_by_set(kwargs, self._valid_tk_constructor_arguments))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <src.gui.app.MetaInspectorApp object .>, screenName = None
+baseName = '__main__', className = 'Tk', useTk = True, sync = False, use = None
+
+    def __init__(self, screenName=None, baseName=None, className='Tk',
+                 useTk=True, sync=False, use=None):
+        """Return a new top level widget on screen SCREENNAME. A new Tcl interpreter will
+        be created. BASENAME will be used for the identification of the profile file (see
+        readprofile).
+        It is constructed from sys.argv[0] without extensions if None is given. CLASSNAME
+        is the name of the widget class."""
+        self.master = None
+        self.children = {}
+        self._tkloaded = False
+        # to avoid recursions in the getattr code in case of failure, we
+        # ensure that self.tk is always _something_.
+        self.tk = None
+        if baseName is None:
+            import os
+            baseName = os.path.basename(sys.argv[0])
+            baseName, ext = os.path.splitext(baseName)
+            if ext not in ('.py', '.pyc'):
+                baseName = baseName + ext
+        interactive = False
+>       self.tk = _tkinter.create(screenName, baseName, className, interactive, wantobjects, useTk, sync, use)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       _tkinter.TclError: Can't find a usable init.tcl in the following directories:
+E           {C:\Users\huzai\Downloads\alizakhan\.test-tcl\tcl8.6} C:/Users/huzai/AppData/Local/Programs/Python/Python312/lib/tcl8.6 C:/Users/huzai/AppData/Local/Programs/Python/lib/tcl8.6 C:/Users/huzai/AppData/Local/Programs/lib/tcl8.6 C:/Users/huzai/AppData/Local/Programs/Python/library C:/Users/huzai/AppData/Local/Programs/library C:/Users/huzai/AppData/Local/Programs/tcl8.6.15/library C:/Users/huzai/AppData/Local/tcl8.6.15/library
+E
+E
+E
+E       This probably means that Tcl wasn't installed properly.
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\tkinter\__init__.py:2346: TclError
+_ ERROR at setup of test_checker_manager_selection_reaches_production_factory _
+
+tmp_path_factory = TempPathFactory(_given_basetemp=WindowsPath('C:/Users/huzai/Downloads/alizakhan/.pytest-local-temp-2'), _trace=<pluggy...mp=WindowsPath('C:/Users/huzai/Downloads/alizakhan/.pytest-local-temp-2'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def gui_root(tmp_path_factory: pytest.TempPathFactory) -> Iterator[MetaInspectorApp]:
+        """Use one Tk root per process, matching the application's real lifetime."""
+>       app = MetaInspectorApp(profile_dir=tmp_path_factory.mktemp("gui") / "browser_profile")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_gui_bridge.py:261:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\gui\app.py:43: in __init__
+    super().__init__(fg_color=theme.BG_DARK)
+..\..\AppData\Local\Programs\Python\Python312\Lib\site-packages\customtkinter\windows\ctk_tk.py:40: in __init__
+    CTK_PARENT_CLASS.__init__(self, **pop_from_dict_by_set(kwargs, self._valid_tk_constructor_arguments))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <src.gui.app.MetaInspectorApp object .>, screenName = None
+baseName = '__main__', className = 'Tk', useTk = True, sync = False, use = None
+
+    def __init__(self, screenName=None, baseName=None, className='Tk',
+                 useTk=True, sync=False, use=None):
+        """Return a new top level widget on screen SCREENNAME. A new Tcl interpreter will
+        be created. BASENAME will be used for the identification of the profile file (see
+        readprofile).
+        It is constructed from sys.argv[0] without extensions if None is given. CLASSNAME
+        is the name of the widget class."""
+        self.master = None
+        self.children = {}
+        self._tkloaded = False
+        # to avoid recursions in the getattr code in case of failure, we
+        # ensure that self.tk is always _something_.
+        self.tk = None
+        if baseName is None:
+            import os
+            baseName = os.path.basename(sys.argv[0])
+            baseName, ext = os.path.splitext(baseName)
+            if ext not in ('.py', '.pyc'):
+                baseName = baseName + ext
+        interactive = False
+>       self.tk = _tkinter.create(screenName, baseName, className, interactive, wantobjects, useTk, sync, use)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       _tkinter.TclError: Can't find a usable init.tcl in the following directories:
+E           {C:\Users\huzai\Downloads\alizakhan\.test-tcl\tcl8.6} C:/Users/huzai/AppData/Local/Programs/Python/Python312/lib/tcl8.6 C:/Users/huzai/AppData/Local/Programs/Python/lib/tcl8.6 C:/Users/huzai/AppData/Local/Programs/lib/tcl8.6 C:/Users/huzai/AppData/Local/Programs/Python/library C:/Users/huzai/AppData/Local/Programs/library C:/Users/huzai/AppData/Local/Programs/tcl8.6.15/library C:/Users/huzai/AppData/Local/tcl8.6.15/library
+E
+E
+E
+E       This probably means that Tcl wasn't installed properly.
+
+..\..\AppData\Local\Programs\Python\Python312\Lib\tkinter\__init__.py:2346: TclError
+107 passed, 4 errors in 11.31s

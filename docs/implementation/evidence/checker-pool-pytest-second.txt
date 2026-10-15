@@ -1,0 +1,17 @@
+........................................................................ [ 75%]
+.......................s                                                 [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] tests\test_gui_bridge.py:311: No display available: Can't find a usable init.tcl in the following directories:
+    {C:\Users\huzai\AppData\Local\Programs\Python\Python312\tcl\tcl8.6}
+
+C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tcl8.6/init.tcl: couldn't read file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tcl8.6/init.tcl": No error
+couldn't read file "C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tcl8.6/init.tcl": No error
+    while executing
+"source C:/Users/huzai/AppData/Local/Programs/Python/Python312/tcl/tcl8.6/init.tcl"
+    ("uplevel" body line 1)
+    invoked from within
+"uplevel #0 [list source $tclfile]"
+
+
+This probably means that Tcl wasn't installed properly.
+95 passed, 1 skipped in 11.96s

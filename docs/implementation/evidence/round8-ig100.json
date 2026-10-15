@@ -1,0 +1,42 @@
+{
+  "elapsed_seconds": 584.6,
+  "rows": 100,
+  "unique_rows": 100,
+  "meets_300_seconds": false,
+  "fields": {
+    "ig_country": {
+      "present": 49,
+      "account-does-not-exist": 7,
+      "extraction-failed": 41,
+      "platform-withheld": 3
+    },
+    "ig_date_joined": {
+      "present": 52,
+      "account-does-not-exist": 7,
+      "extraction-failed": 41
+    },
+    "threads_country": {
+      "not-checked": 100
+    },
+    "threads_date_joined": {
+      "not-checked": 100
+    },
+    "threads_badge": {
+      "not-checked": 100
+    }
+  },
+  "quality": {
+    "Complete": 49,
+    "Not available": 7,
+    "Failed": 41,
+    "Partial": 3
+  },
+  "status": {
+    "ACTIVE": 63,
+    "NOT_FOUND": 7,
+    "ERROR": 30
+  },
+  "checkers": {
+    "checker_5": 100
+  }
+}

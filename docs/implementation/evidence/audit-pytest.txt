@@ -1,0 +1,14 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\huzai\Downloads\alizakhan
+configfile: pytest.ini
+testpaths: tests
+plugins: anyio-4.15.1
+collected 81 items
+
+tests\test_ban_engine.py .................                               [ 20%]
+tests\test_core_helpers.py ...............................               [ 59%]
+tests\test_extractor_edge_cases.py .............                         [ 75%]
+tests\test_gui_bridge.py ....................                            [100%]
+
+============================= 81 passed in 1.86s ==============================

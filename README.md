@@ -4,13 +4,42 @@ A high-performance Windows desktop application to verify account alive/banned st
 
 ---
 
-## Key Features
-- **High Throughput:** 100 accounts in 4 to 5 minutes via 5-worker parallel browser concurrency.
-- **Cross-Platform Ban Linking:** If either platform is flagged as banned/suspended, both are marked as BANNED.
-- **Three Modes:** Instagram Only, Threads Only, or Combined Mode.
-- **1-Click Google Sheets Export:** Copies clean TSV formatted data to clipboard for immediate `Ctrl + V` pasting.
-- **Run History:** Embedded SQLite database logging all past execution runs.
-- **1-Time Login:** Persistent browser session storage with zero plain-text password retention.
+## Current branch capabilities
+
+- Instagram Only, Threads Only and Combined lookups.
+- Five independent saved checker profiles, one active worker per profile, with
+  per-platform login preflight and a shared target queue.
+- Target identity checks, separate account status and extraction quality,
+  checker attribution, full row details and opt-in local debug captures.
+- Immediate JSONL result retention in `results/`.
+- Optional account-file import with local authenticator codes and isolated
+  automatic login; passwords/2FA seeds are not saved in app configuration.
+
+One authenticated Combined extraction has been verified against raw dialogs;
+a later run failed during page/menu loading. Reliable five-account scaling and
+the **100 accounts under five minutes** benchmark are not yet verified.
+Current findings are tracked in [the problem log](docs/problem_log.md). Clipboard/Google
+Sheets export and a SQLite history viewer are not implemented on this branch.
+
+## Run and set up accounts
+
+```powershell
+python main.py
+```
+
+Restart an older running app to load these changes. Open **Setup Checker Account**,
+log into both Instagram and Threads for each slot, close each login browser,
+select the slots and save. The **Checker limit** caps concurrent slots.
+For the supplied account file, choose **Import accounts & auto-login** in Setup
+and select `docs/accounts.txt` (`username|password|2FA secret`, up to five rows).
+Setup runs one account at a time, then the saved accounts can check in parallel.
+Setup records failed accounts, closes their windows and continues with the rest.
+Read the final per-account summary. For a manual security/setup step, reopen that
+slot with **Login IG + Threads**, complete it and close the browser. Checking uses
+healthy selected slots; a mid-run session challenge still stops the batch.
+See [step-by-step verification](docs/manual_verification.md) and the
+[actual test outcomes](docs/test_log.md). The old packaged executable has not
+been rebuilt with these changes.
 
 ---
 
@@ -22,6 +51,7 @@ All architectural and development specifications are documented in the `docs/` f
 - [design.md](docs/design.md): UI/UX Theme, Colors & Component Layout
 - [tasks.md](docs/tasks.md): 15-Day Milestone Breakdown & Granular Sprints
 - [memory.md](docs/memory.md): Project Memory, Client Log & Issue History
+- [problem_log.md](docs/problem_log.md): Central problem inventory, evidence, corrections, and next actions
 - [team_roles_and_workflow.md](docs/team_roles_and_workflow.md): Team Roles & Collaboration Workflow
 - [ISSUE_concurrent_session_detection.md](docs/ISSUE_concurrent_session_detection.md): Open issue, live testing risk, read before Sprint 4
 

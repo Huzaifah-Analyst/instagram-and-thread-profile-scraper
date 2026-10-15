@@ -5,9 +5,12 @@ import threading
 import time
 import tkinter as tk
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Iterator
 
 import pytest
+
+from src.gui.app import MetaInspectorApp
+from src.core.checkers import CheckerStore
 
 from src.core.scraper import MultiWorkerScraper
 from src.core.session import SESSION_CONNECTED, SESSION_DISCONNECTED, _now_chrome_micros, check_session
@@ -212,8 +215,35 @@ def test_record_to_row() -> None:
     record = {"username": "elif", "composite_status": "ACTIVE", "ig_status": "active", "ig_country": "Turkey",
               "ig_date_joined": "Sep 2026", "threads_date_joined": "Sep 2026", "threads_badge": "100M+",
               "seconds": 2.44}
-    assert record_to_row(1, record) == ("01", "@elif", "ACTIVE", "Turkey", "Sep 2026", "N/A",
-                                        "Sep 2026 · 100M+", "2.4s")
+    assert record_to_row(1, record) == ("01", "@elif", "ACTIVE", "Unknown", "", "Turkey", "Sep 2026", "N/A",
+                                        "Sep 2026 · 100M+", "2.4s", "")
+
+
+def test_record_to_row_surfaces_error_message() -> None:
+    """An operator must be able to see *why* a row has no data (ISSUE_concurrent_session_detection.md)."""
+    record = {"username": "elif", "composite_status": "ACTIVE", "ig_status": "active",
+              "seconds": 8.1, "error_message": "IG about dialog did not load within timeout"}
+    row = record_to_row(1, record)
+    assert row[-1] == "IG about dialog did not load within timeout"
+
+
+def test_record_to_row_collapses_a_multiline_error_to_one_line() -> None:
+    """A raw multi-line Playwright exception (seen live, 2026-10-10) must not grow the row."""
+    record = {"username": "elif", "composite_status": "ACTIVE", "ig_status": "active", "seconds": 34.7,
+              "error_message": "Threads error: Locator.click: Timeout 5000ms exceeded.\nCall log:\n  - waiting"}
+    row = record_to_row(1, record)
+    assert "\n" not in row[-1]
+    assert row[-1] == "Threads error: Locator.click: Timeout 5000ms exceeded. Call log: - waiting"
+
+
+def test_record_to_row_truncates_a_very_long_error() -> None:
+    from src.gui.components.data_table import _ERROR_CELL_MAX_CHARS
+
+    record = {"username": "elif", "composite_status": "ACTIVE", "ig_status": "active",
+              "seconds": 1.0, "error_message": "x" * 500}
+    row = record_to_row(1, record)
+    assert len(row[-1]) == _ERROR_CELL_MAX_CHARS
+    assert row[-1].endswith("…")
 
 
 def test_eta_and_duration() -> None:
@@ -223,27 +253,143 @@ def test_eta_and_duration() -> None:
     assert theme.format_duration(9.6) == "10s"
 
 
-# ---- GUI smoke test ------------------------------------------------------- #
+# ---- GUI smoke tests: one real Tk interpreter, reset per test ------------ #
 
-def test_app_runs_a_fake_check_end_to_end(tmp_path: Path) -> None:
-    """Builds the real window, starts a run via the Start button and checks the table fills."""
-    from src.gui.app import MetaInspectorApp
+@pytest.fixture(scope="module")
+def gui_root(tmp_path_factory: pytest.TempPathFactory) -> Iterator[MetaInspectorApp]:
+    """Use one Tk root per process, matching the application's real lifetime."""
+    app = MetaInspectorApp(profile_dir=tmp_path_factory.mktemp("gui") / "browser_profile")
+    app.withdraw()
+    yield app
+    app.destroy()
 
-    try:
-        app = MetaInspectorApp(profile_dir=tmp_path, scraper_factory=lambda mode, cb: FakeScraper(mode, cb))
-    except tk.TclError as exc:
-        pytest.skip(f"No display available: {exc}")
-    try:
-        app.withdraw()
-        app.left_panel.textbox.insert("1.0", "@alice\nbob\nalice\n")
-        app.left_panel.start_button.invoke()
-        deadline = time.monotonic() + 5
-        while app.bridge.state is not RunState.IDLE or len(app.table.records) < 2:
-            app.update()
-            if time.monotonic() > deadline:
-                raise AssertionError("GUI run did not finish")
-        rows = [app.table.tree.item(i, "values") for i in app.table.tree.get_children()]
-        assert [r[1] for r in rows] == ["@alice", "@bob"]
-        assert app.left_panel.start_button.cget("state") == "normal"
-    finally:
-        app.destroy()
+
+@pytest.fixture
+def gui_app(gui_root: MetaInspectorApp, tmp_path: Path) -> Iterator[MetaInspectorApp]:
+    """Reset state and settings while preserving the single Tk interpreter."""
+    app = gui_root
+    app.profile_dir = tmp_path / "browser_profile"
+    app.checker_store = CheckerStore(app.profile_dir)
+    app.bridge = ScraperBridge(app._default_factory)
+    app._checker_dialog = None
+    app._session_invalid = False
+    app.left_panel.workers_var.set("5")
+    app.left_panel.dialog_timeout_var.set("10")
+    app.left_panel.menu_timeout_var.set("8")
+    app.left_panel.debug_dump_var.set(False)
+    app.left_panel.textbox.delete("1.0", "end")
+    app.table.clear()
+    app._refresh_session()
+    app._apply_state()
+    yield app
+    app.bridge.stop()
+    app.bridge.join(timeout=5)
+    app.update()
+    if app._checker_dialog is not None and app._checker_dialog.winfo_exists():
+        app._checker_dialog.destroy()
+
+
+def test_gui_worker_count_is_not_hardcoded(gui_app: MetaInspectorApp) -> None:
+    """The real option menu controls the number of active checkers."""
+    assert gui_app.left_panel.workers == 5
+    gui_app.left_panel.workers_var.set("1")
+    scraper = gui_app._default_factory("combined", lambda *_: None)
+    assert scraper.workers == 1
+
+
+def test_gui_dialog_menu_timeout_and_debug_dump_are_not_hardcoded(gui_app: MetaInspectorApp) -> None:
+    """Widget settings reach the engine; invalid input is visibly rejected."""
+    from src.core.extractors import DIALOG_TIMEOUT_S, MENU_CLICK_TIMEOUT_S
+
+    panel = gui_app.left_panel
+    assert panel.dialog_timeout_s == DIALOG_TIMEOUT_S
+    assert panel.menu_click_timeout_s == MENU_CLICK_TIMEOUT_S
+    assert panel.debug_dump is False
+    panel.dialog_timeout_var.set("20")
+    panel.menu_timeout_var.set("15")
+    panel.debug_dump_var.set(True)
+    scraper = gui_app._default_factory("combined", lambda *_: None)
+    assert (scraper.dialog_timeout_s, scraper.menu_click_timeout_s, scraper.debug_dump) == (20., 15., True)
+    panel.dialog_timeout_var.set("not a number")
+    with pytest.raises(ValueError):
+        panel.validate_timeouts()
+    gui_app.left_panel.textbox.insert("1.0", "target")
+    gui_app.left_panel.start_button.invoke()
+    assert gui_app.bridge.state is RunState.IDLE
+
+
+def test_app_runs_a_fake_check_end_to_end(gui_app: MetaInspectorApp) -> None:
+    """Start through real widgets, drain worker events, and verify table rows."""
+    app = gui_app
+    app.bridge = ScraperBridge(lambda mode, cb: FakeScraper(mode, cb))
+    app.left_panel.textbox.insert("1.0", "@alice\nbob\nalice\n")
+    app.left_panel.start_button.invoke()
+    deadline = time.monotonic() + 5
+    while app.bridge.state is not RunState.IDLE or len(app.table.records) < 2:
+        app.update()
+        if time.monotonic() > deadline:
+            raise AssertionError("GUI run did not finish")
+    rows = [app.table.tree.item(i, "values") for i in app.table.tree.get_children()]
+    assert [r[1] for r in rows] == ["@alice", "@bob"]
+    assert app.left_panel.start_button.cget("state") == "normal"
+
+
+def test_checker_manager_selection_reaches_production_factory(
+    gui_app: MetaInspectorApp, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Actual widgets persist selections and request the chosen login slot."""
+    app = gui_app
+    requested = []
+    monkeypatch.setattr(app, "_start_login", requested.append)
+    app._open_checker_manager()
+    dialog = app._checker_dialog
+    assert len(dialog.variables) == 5
+    for variable in dialog.variables:
+        variable.set(True)
+    dialog._save()
+    scraper = app._default_factory("combined", lambda *_: None)
+    assert len(scraper.checkers) == 5
+    assert len({slot.profile_dir for slot in scraper.checkers}) == 5
+    assert "live check on Start" in app._session_label.cget("text")
+    app._open_checker_manager()
+    dialog = app._checker_dialog
+    dialog._login(dialog.slots[3])
+    assert requested[0].checker_id == "checker_4"
+
+
+def test_checker_import_validates_then_launches_bound_accounts(
+    gui_app: MetaInspectorApp, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The actual import dialog rejects bad input before touching selections."""
+    from src.gui.components import checker_dialog
+
+    requested = []
+    monkeypatch.setattr(gui_app, "_start_import_login", lambda *args: requested.append(args))
+    source = tmp_path / "accounts.txt"
+    source.write_text("invalid")
+    monkeypatch.setattr(checker_dialog.filedialog, "askopenfilename", lambda **_: str(source))
+    gui_app._open_checker_manager()
+    dialog = gui_app._checker_dialog
+    dialog._import()
+    assert dialog.winfo_exists() and not requested
+    assert not gui_app.checker_store.path.exists()
+    source.write_text("alice|synthetic-password|JBSWY3DPEHPK3PXP")
+    dialog._import()
+    assert len(requested) == 1
+    accounts, checkers = requested[0]
+    assert accounts[0].username == checkers[0].username == "alice"
+    assert gui_app._default_factory("combined", lambda *_: None).checkers == checkers
+    assert "synthetic-password" not in gui_app.checker_store.path.read_text()
+
+
+
+def test_single_checker_setup_uses_direct_manual_flow(
+    gui_app: MetaInspectorApp, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The default Setup button avoids account import and the multi-slot dialog."""
+    requested = []
+    monkeypatch.setattr(gui_app, "_start_login", requested.append)
+    gui_app.setup_button.invoke()
+    assert len(requested) == 1
+    assert requested[0].profile_dir == gui_app.profile_dir
+    assert gui_app._checker_dialog is None

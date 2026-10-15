@@ -1,5 +1,7 @@
 """Unit tests for browser-free helpers in the core engine."""
 
+import asyncio
+
 import pytest
 
 from src.core.extractors import (
@@ -10,7 +12,13 @@ from src.core.extractors import (
     split_threads_joined,
 )
 from src.core.resource_blocker import should_block
-from src.core.scraper import build_record, chunk_usernames, clean_usernames, empty_platform_result
+from src.core.scraper import (
+    MultiWorkerScraper,
+    build_record,
+    chunk_usernames,
+    clean_usernames,
+    empty_platform_result,
+)
 
 
 # ---- resource blocker (TSK-101) ------------------------------------------- #
@@ -92,6 +100,19 @@ def test_not_found_and_private_markers() -> None:
     assert not is_not_found_page("someuser 10 posts")
 
 
+def test_threads_not_found_wording_is_recognized() -> None:
+    """Round 5, 2026-10-13: real captured Threads 404 text, previously unmatched --
+    it was misclassified as an identity-verification failure instead of NOT_FOUND
+    for ~24/50 targets in a live Combined batch. Exact text from
+    debug/threads_lukehodges43_identity_20261013_131222_261285.txt."""
+    body = (
+        "Not all who wander are lost, but this page is\n"
+        "The link's not working or the page is gone. Go back to keep exploring.\n"
+        "Back\n© 2026\nThreads Terms\nPrivacy Policy\nCookies Policy"
+    )
+    assert is_not_found_page(body)
+
+
 # ---- dispatcher helpers (TSK-105) ----------------------------------------- #
 
 def test_chunks_100_accounts_into_5_by_20() -> None:
@@ -116,6 +137,60 @@ def test_clean_usernames() -> None:
     assert clean_usernames([" @Alice ", "bob", "", "alice", "bob\n"]) == ["Alice", "bob"]
 
 
+def test_scraper_defaults_match_extractor_timeouts(tmp_path) -> None:
+    """Defaults stay the current extractor budgets; see ISSUE_concurrent_session_detection.md."""
+    from src.core import extractors
+    from src.core.scraper import MultiWorkerScraper
+
+    scraper = MultiWorkerScraper(profile_dir=tmp_path)
+    assert scraper.page_ready_timeout_s == extractors.PAGE_READY_TIMEOUT_S
+    assert scraper.dialog_timeout_s == extractors.DIALOG_TIMEOUT_S
+    assert scraper.menu_click_timeout_s == extractors.MENU_CLICK_TIMEOUT_S
+
+
+def test_scraper_timeouts_are_configurable_without_a_code_change(tmp_path) -> None:
+    """Huzaifah must be able to widen timeouts for a concurrent-load test via a constructor arg."""
+    from src.core.scraper import MultiWorkerScraper
+
+    scraper = MultiWorkerScraper(profile_dir=tmp_path, page_ready_timeout_s=16.0,
+                                 dialog_timeout_s=16.0, menu_click_timeout_s=8.0)
+    assert (scraper.page_ready_timeout_s, scraper.dialog_timeout_s, scraper.menu_click_timeout_s) == (16.0, 16.0, 8.0)
+
+
+def test_scraper_debug_dump_defaults_off_and_is_configurable(tmp_path) -> None:
+    from src.core.scraper import MultiWorkerScraper
+
+    assert MultiWorkerScraper(profile_dir=tmp_path).debug_dump is False
+    assert MultiWorkerScraper(profile_dir=tmp_path, debug_dump=True).debug_dump is True
+
+
+def test_check_account_passes_timeouts_and_debug_dump_to_extractors(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    """`_check_account` must forward the scraper's configured timeouts/debug_dump, not the
+    extractor module defaults, to whichever mode's extractor(s) it calls."""
+    import src.core.scraper as scraper_module
+
+    seen_kwargs: dict = {}
+
+    async def fake_extract_instagram(_page, _username: str, **kwargs) -> dict:
+        seen_kwargs.update(kwargs)
+        return {**empty_platform_result(), "status": "active"}
+
+    monkeypatch.setattr(scraper_module, "extract_instagram", fake_extract_instagram)
+
+    scraper = MultiWorkerScraper(
+        profile_dir=tmp_path, mode="ig_only", page_ready_timeout_s=11.0,
+        dialog_timeout_s=12.0, menu_click_timeout_s=13.0, debug_dump=True,
+    )
+    asyncio.run(scraper._check_account(object(), "someuser"))
+
+    assert seen_kwargs == {
+        "page_ready_timeout_s": 11.0, "dialog_timeout_s": 12.0,
+        "menu_click_timeout_s": 13.0, "debug_dump": True,
+    }
+
+
 def test_build_record_links_ban_and_joins_errors() -> None:
     ig = {**empty_platform_result(), "status": "active", "country": "Turkey"}
     threads = {**empty_platform_result(), "status": "suspended", "error": "x"}
@@ -125,3 +200,34 @@ def test_build_record_links_ban_and_joins_errors() -> None:
     assert record["ig_country"] == "Turkey"
     assert record["error_message"] == "x"
     assert record["seconds"] == 3.14
+
+
+# ---- fail-safe abort on a checker-session challenge (TSK-403) ------------- #
+#
+# No live checker account was available to trigger a real challenge, so this
+# confirms the abort logic in `_worker` itself (mocked extractors, no browser)
+# rather than a real run under load, per docs/tasks.md TSK-403.
+
+def test_worker_stops_immediately_when_session_is_blocked(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    """A BLOCKED account must stop the run before any later account in its chunk runs."""
+    import src.core.scraper as scraper_module
+
+    seen: list[str] = []
+
+    async def fake_extract_instagram(_page, username: str, **_kwargs) -> dict:
+        seen.append(username)
+        if username == "flagged":
+            return {**empty_platform_result(), "status": "session_blocked", "error": "IG session blocked: test"}
+        return {**empty_platform_result(), "status": "active"}
+
+    monkeypatch.setattr(scraper_module, "extract_instagram", fake_extract_instagram)
+
+    scraper = MultiWorkerScraper(profile_dir=tmp_path, workers=1, mode="ig_only", min_delay=0, max_delay=0)
+    items = list(enumerate(["first", "flagged", "never_reached"]))
+    results: dict[int, dict] = {}
+    asyncio.run(scraper._worker(0, object(), items, results))
+
+    assert seen == ["first", "flagged"]  # the worker must not continue to "never_reached"
+    assert scraper.is_stopped
+    assert scraper.stop_reason is not None and "flagged" in scraper.stop_reason
+    assert results[1]["composite_status"] == "BLOCKED"

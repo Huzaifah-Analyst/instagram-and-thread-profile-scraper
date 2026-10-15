@@ -1,12 +1,32 @@
 # ISSUE: 5-Worker Concurrent Runs Consistently Lose Transparency Data
 
+## 2026-10-13 Round 5 evidence update
+
+A controlled single-checker experiment is now available. Wildcard routing with
+zero policy-aborted assets still degraded five-page IG extraction (3/8), while
+no routing and the corrected selective blocker each returned 8/8. A real local
+HTTP regression proves the old route handler loses script caching and the new
+handler preserves it. A one-page repeat also failed, so five-page concurrency
+alone does not explain these runs. No permanent account restriction is inferred.
+See [blocker controls](implementation/round5-resource-blocker.md),
+[concurrency comparison](implementation/round5-concurrency.md), and the
+[50-account recheck](implementation/TSK-401-nfr1-benchmark.md#round-5-50-account-combined-recheck-claude-continuation-13-october-2026).
+Two further evidence-backed classification fixes (Threads' real 404 wording,
+and panels with no country row at all) are in
+[round5-threads-404.md](implementation/round5-threads-404.md) and
+[round5-threads-country-absent.md](implementation/round5-threads-country-absent.md).
+The original investigation below is retained as historical evidence, not the
+current acceptance result.
+
+
 ## Document: `docs/ISSUE_concurrent_session_detection.md`
 **Project:** MetaInspector Desktop (Instagram & Threads Checker)
 **Raised by:** Claude Code, Owner's session (Lead Architect/QA role, see `docs/team_roles_and_workflow.md`)
 **For:** Partner Developer + Claude
-**Date:** 2026-10-07, updated 2026-10-08
-**Status:** Open, not yet isolated. Does not block Sprint 3, but must be resolved before Sprint 4 (TSK-401 100-account benchmark).
-**Full raw evidence:** `docs/memory.md` §5 ("Live Testing Findings": Test A, Incident 5, Test B)
+**Date:** 2026-10-07, updated 2026-10-08, updated 2026-10-10
+**Status:** Open, not fully isolated. Still must be resolved (and NFR-1 re-benchmarked) before treating Sprint 4 as done.
+**2026-10-10 update:** item 3 below (dump the raw dialog text) is now implemented as `--debug-dump`/the GUI's "Save debug captures" checkbox, and the GUI no longer silently ignores widened timeouts the way it did for Test C's runs — see `docs/memory.md` §6 for the full write-up, including a new, more concerning finding (§6.2 point 4: a suspiciously identical "October 2025" join date parsed for dozens of unrelated accounts, not yet explained).
+**Full raw evidence:** `docs/memory.md` §5-6 ("Live Testing Findings": Test A, Incident 5, Test B, Test C)
 
 ---
 

@@ -9,9 +9,15 @@ from typing import Callable
 
 import customtkinter as ctk
 
-from src.core.scraper import MODE_COMBINED, MODE_IG_ONLY, MODE_THREADS_ONLY, clean_usernames
+from src.core.extractors import DIALOG_TIMEOUT_S, MENU_CLICK_TIMEOUT_S
+from src.core.scraper import DEFAULT_WORKERS, clean_usernames
+from src.core.modes import (
+    MODE_COMBINED, MODE_IG_ONLY, MODE_THREADS_ONLY,
+    MODE_COMBINED_SMART, MODE_IG_STATUS_ONLY,
+)
 from src.gui import theme
 from src.gui.bridge import RunState
+from src.core.validation import positive_seconds
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +25,13 @@ MODE_LABELS = (
     (MODE_COMBINED, "Combined (IG + Threads)"),
     (MODE_IG_ONLY, "Instagram Only"),
     (MODE_THREADS_ONLY, "Threads Only"),
+    (MODE_COMBINED_SMART, "Smart Combined (skip Threads when IG gives country)"),
+    (MODE_IG_STATUS_ONLY, "IG Status Only (no login, fastest)"),
 )
+WORKER_CHOICES = ("1", "2", "3", "4", "5")
 
 
-class LeftPanel(ctk.CTkFrame):
+class LeftPanel(ctk.CTkScrollableFrame):
     """Collects usernames and mode, and exposes Start / Pause / Stop."""
 
     def __init__(
@@ -31,6 +40,7 @@ class LeftPanel(ctk.CTkFrame):
         on_start: Callable[[], None],
         on_pause_toggle: Callable[[], None],
         on_stop: Callable[[], None],
+        on_mode_changed: Callable[[], None] | None = None,
     ) -> None:
         """Builds the panel.
 
@@ -41,9 +51,7 @@ class LeftPanel(ctk.CTkFrame):
             on_stop: Called when Stop is clicked.
         """
         super().__init__(master, width=theme.LEFT_PANEL_WIDTH, fg_color=theme.BG_SURFACE, corner_radius=0)
-        self.grid_propagate(False)
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 6))
@@ -53,7 +61,7 @@ class LeftPanel(ctk.CTkFrame):
                                          text_color=theme.TEXT_MUTED)
         self._count_label.pack(side="right")
 
-        self.textbox = ctk.CTkTextbox(self, font=theme.FONT_BODY, fg_color=theme.BG_ELEVATED,
+        self.textbox = ctk.CTkTextbox(self, height=130, font=theme.FONT_BODY, fg_color=theme.BG_ELEVATED,
                                       border_color=theme.BORDER_COLOR, border_width=1,
                                       text_color=theme.TEXT_PRIMARY)
         self.textbox.grid(row=1, column=0, sticky="nsew", padx=16)
@@ -69,22 +77,74 @@ class LeftPanel(ctk.CTkFrame):
                      text_color=theme.TEXT_PRIMARY).grid(row=3, column=0, sticky="w", padx=16, pady=(0, 6))
         self.mode_var = ctk.StringVar(value=MODE_COMBINED)
         self._mode_buttons: list[ctk.CTkRadioButton] = []
-        for row, (value, label) in enumerate(MODE_LABELS, start=4):
-            button = ctk.CTkRadioButton(self, text=label, value=value, variable=self.mode_var,
-                                        font=theme.FONT_BODY, text_color=theme.TEXT_PRIMARY,
-                                        fg_color=theme.ACCENT_BLUE, hover_color=theme.ACCENT_HOVER)
-            button.grid(row=row, column=0, sticky="w", padx=20, pady=3)
+        mode_frame = ctk.CTkScrollableFrame(self, height=155, fg_color="transparent")
+        mode_frame.grid(row=4, column=0, rowspan=3, sticky="ew", padx=12)
+        self._mode_labels: list[ctk.CTkLabel] = []
+        for row, (value, label) in enumerate(MODE_LABELS):
+            button = ctk.CTkRadioButton(
+                mode_frame, text="", value=value, variable=self.mode_var, width=28,
+                command=on_mode_changed, fg_color=theme.ACCENT_BLUE,
+            )
+            button.grid(row=row, column=0, sticky="nw", pady=4)
+            caption = ctk.CTkLabel(
+                mode_frame, text=label, font=theme.FONT_BODY, wraplength=225,
+                justify="left", anchor="w",
+            )
+            caption.grid(row=row, column=1, sticky="w", padx=4, pady=2)
+            caption.bind("<Button-1>", lambda _event, control=button: control.invoke())
             self._mode_buttons.append(button)
+            self._mode_labels.append(caption)
+
+        workers_row = ctk.CTkFrame(self, fg_color="transparent")
+        workers_row.grid(row=7, column=0, sticky="ew", padx=16, pady=(12, 0))
+        ctk.CTkLabel(workers_row, text="Parallel workers", font=theme.FONT_SECTION,
+                     text_color=theme.TEXT_PRIMARY).pack(side="left")
+        self.workers_var = ctk.StringVar(value=str(DEFAULT_WORKERS))
+        self.workers_menu = ctk.CTkOptionMenu(workers_row, values=list(WORKER_CHOICES),
+                                              variable=self.workers_var, width=70,
+                                              fg_color=theme.BG_ELEVATED, button_color=theme.BG_ELEVATED,
+                                              button_hover_color=theme.BORDER_COLOR)
+        self.workers_menu.pack(side="right")
+
+        # Dialog/menu-click timeouts: exposed after live testing on 2026-10-10
+        # (docs/memory.md) showed most failures were the old, tighter defaults
+        # running out before Threads'/Instagram's panel finished rendering.
+        # Previously only the CLI's --dialog-timeout/--menu-click-timeout could
+        # change these; the GUI silently always used the module defaults.
+        timeouts_row = ctk.CTkFrame(self, fg_color="transparent")
+        timeouts_row.grid(row=8, column=0, sticky="ew", padx=16, pady=(10, 0))
+        timeouts_row.grid_columnconfigure((1, 3), weight=1)
+        ctk.CTkLabel(timeouts_row, text="Dialog (s)", font=theme.FONT_CAPTION,
+                     text_color=theme.TEXT_MUTED).grid(row=0, column=0, sticky="w")
+        self.dialog_timeout_var = ctk.StringVar(value=str(DIALOG_TIMEOUT_S))
+        self.dialog_timeout_entry = ctk.CTkEntry(timeouts_row, textvariable=self.dialog_timeout_var, width=48,
+                                                 fg_color=theme.BG_ELEVATED, border_color=theme.BORDER_COLOR,
+                                                 font=theme.FONT_CAPTION)
+        self.dialog_timeout_entry.grid(row=0, column=1, sticky="w", padx=(4, 12))
+        ctk.CTkLabel(timeouts_row, text="Menu (s)", font=theme.FONT_CAPTION,
+                     text_color=theme.TEXT_MUTED).grid(row=0, column=2, sticky="w")
+        self.menu_timeout_var = ctk.StringVar(value=str(MENU_CLICK_TIMEOUT_S))
+        self.menu_timeout_entry = ctk.CTkEntry(timeouts_row, textvariable=self.menu_timeout_var, width=48,
+                                               fg_color=theme.BG_ELEVATED, border_color=theme.BORDER_COLOR,
+                                               font=theme.FONT_CAPTION)
+        self.menu_timeout_entry.grid(row=0, column=3, sticky="w", padx=(4, 0))
+
+        self.debug_dump_var = ctk.BooleanVar(value=False)
+        self.debug_dump_check = ctk.CTkCheckBox(
+            self, text="🐛  Save debug captures", variable=self.debug_dump_var, font=theme.FONT_CAPTION,
+            text_color=theme.TEXT_MUTED, fg_color=theme.ACCENT_BLUE, hover_color=theme.ACCENT_HOVER,
+        )
+        self.debug_dump_check.grid(row=9, column=0, sticky="w", padx=16, pady=(8, 0))
 
         ctk.CTkLabel(self, text="Controls", font=theme.FONT_SECTION,
-                     text_color=theme.TEXT_PRIMARY).grid(row=7, column=0, sticky="w", padx=16, pady=(16, 6))
+                     text_color=theme.TEXT_PRIMARY).grid(row=10, column=0, sticky="w", padx=16, pady=(16, 6))
         self.start_button = ctk.CTkButton(self, text="▶  Start Checking", command=on_start, height=38,
                                           fg_color=theme.ACCENT_BLUE, hover_color=theme.ACCENT_HOVER,
                                           font=theme.FONT_SECTION)
-        self.start_button.grid(row=8, column=0, sticky="ew", padx=16)
+        self.start_button.grid(row=11, column=0, sticky="ew", padx=16)
 
         row_frame = ctk.CTkFrame(self, fg_color="transparent")
-        row_frame.grid(row=9, column=0, sticky="ew", padx=16, pady=(8, 16))
+        row_frame.grid(row=12, column=0, sticky="ew", padx=16, pady=(8, 16))
         row_frame.grid_columnconfigure((0, 1), weight=1)
         self.pause_button = ctk.CTkButton(row_frame, text="❚❚  Pause", command=on_pause_toggle,
                                           fg_color=theme.BG_ELEVATED, hover_color=theme.BORDER_COLOR,
@@ -106,6 +166,31 @@ class LeftPanel(ctk.CTkFrame):
         """Selected checking mode."""
         return self.mode_var.get()
 
+    @property
+    def workers(self) -> int:
+        """Selected worker count (1 to 5), so a 1-worker run can be tested from the GUI."""
+        return int(self.workers_var.get())
+
+    @property
+    def dialog_timeout_s(self) -> float:
+        """Validated dialog-render timeout in seconds; invalid input raises."""
+        return positive_seconds(float(self.dialog_timeout_var.get()))
+
+    @property
+    def menu_click_timeout_s(self) -> float:
+        """Validated menu-click timeout in seconds; invalid input raises."""
+        return positive_seconds(float(self.menu_timeout_var.get()))
+
+    def validate_timeouts(self) -> None:
+        """Validate both fields before starting any background work."""
+        positive_seconds(self.dialog_timeout_s)
+        positive_seconds(self.menu_click_timeout_s)
+
+    @property
+    def debug_dump(self) -> bool:
+        """``True`` when "Save debug captures" is checked."""
+        return bool(self.debug_dump_var.get())
+
     def apply_state(self, state: RunState, start_allowed: bool = True) -> None:
         """Enables/disables controls for the given run state.
 
@@ -125,6 +210,10 @@ class LeftPanel(ctk.CTkFrame):
         self.import_button.configure(state=input_state)
         for button in self._mode_buttons:
             button.configure(state=input_state)
+        self.workers_menu.configure(state=input_state)
+        self.dialog_timeout_entry.configure(state=input_state)
+        self.menu_timeout_entry.configure(state=input_state)
+        self.debug_dump_check.configure(state=input_state)
 
     def _import_file(self) -> None:
         """Loads a .txt file of usernames into the textbox."""
@@ -139,9 +228,14 @@ class LeftPanel(ctk.CTkFrame):
             self._count_label.configure(text="Could not read file", text_color=theme.STATUS_BANNED)
             return
         self.textbox.delete("1.0", "end")
-        self.textbox.insert("1.0", "\n".join(clean_usernames(text.splitlines())))
+        self.textbox.insert("1.0", text)
         self._refresh_count()
 
     def _refresh_count(self) -> None:
         """Updates the "N accounts" caption."""
-        self._count_label.configure(text=f"{len(self.usernames())} accounts", text_color=theme.TEXT_MUTED)
+        try:
+            count = len(self.usernames())
+        except ValueError:
+            self._count_label.configure(text="Invalid username/URL", text_color=theme.STATUS_WARN)
+            return
+        self._count_label.configure(text=f"{count} accounts", text_color=theme.TEXT_MUTED)

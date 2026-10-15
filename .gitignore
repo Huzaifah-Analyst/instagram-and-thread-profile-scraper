@@ -10,7 +10,9 @@ __pycache__/
 dist/
 build/
 *.egg-info/
-*.spec
+# Only ignore an ad-hoc spec PyInstaller drops at the repo root; the real
+# packaging spec (TSK-501) lives at config/metainspector.spec and is tracked.
+/*.spec
 
 # Virtual Environments
 venv/
@@ -21,6 +23,9 @@ ENV/
 # Playwright & Browser Sessions (CRITICAL SECURITY: NEVER COMMIT)
 browser_profile/
 **/browser_profile/
+checker_profiles/
+checkers.json
+checkers.tmp
 *.session
 cookies.json
 tokens.json
@@ -32,6 +37,11 @@ logs/
 debug/
 **/debug/
 .pytest_cache/
+.pytest-local-temp*/
+.pytest-local-round3*/
+.test-tcl/
+/docs/accounts.txt
+/docs/testinusername.txt
 
 # Sensitive Configuration
 .env
@@ -49,3 +59,11 @@ results/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Per-account benchmark exports remain local; publish aggregate metrics only.
+/docs/implementation/evidence/round4-benchmark95-rows.tsv
+/docs/implementation/evidence/round4-platform-timings.tsv
+
+# Local output preferences
+output_settings.json
+output_settings.tmp

@@ -7,6 +7,7 @@ Treeview colours whole rows, so each row is tinted by its status badge colour.
 from __future__ import annotations
 
 import tkinter as tk
+import json
 from tkinter import ttk
 
 import customtkinter as ctk
@@ -17,13 +18,42 @@ COLUMNS = (
     ("idx", "#", 40, "center"),
     ("username", "Username", 130, "w"),
     ("status", "Status", 90, "center"),
+    ("quality", "Data", 100, "center"),
+    ("checker", "Checker", 100, "w"),
     ("ig_country", "IG Country", 95, "w"),
     ("ig_joined", "IG Joined", 105, "w"),
     ("threads_country", "Threads Country", 110, "w"),
     ("threads_joined", "Threads Joined", 125, "w"),
     ("duration", "Duration", 65, "e"),
+    ("error", "Error", 160, "w"),
 )
-_STYLE = "MetaInspector.Treeview"
+TREE_STYLE = _STYLE = "MetaInspector.Treeview"
+_ERROR_CELL_MAX_CHARS = 200
+
+
+def _error_cell(error_message: object) -> str:
+    """Collapses an error message to one line, truncated, for the live table.
+
+    `extractors.py`'s `_short_error` already keeps new error messages to one
+    line, but this is a second line of defence: a multi-line value here (seen
+    live on 2026-10-10 from a raw Playwright exception, before that fix) would
+    otherwise make the Treeview row visually taller than every other row.
+    """
+    if not error_message:
+        return ""
+    text = " ".join(str(error_message).split())
+    if len(text) > _ERROR_CELL_MAX_CHARS:
+        text = text[: _ERROR_CELL_MAX_CHARS - 1] + "…"
+    return text
+
+
+def metadata_cell(record: dict, field: str) -> str:
+    """Explain unrequested fields without fabricating underlying record values."""
+    if record.get("checking_mode") == "ig_status_only":
+        return "Unavailable (status only)" if field.startswith("ig_") else "Not checked"
+    if field.startswith("threads_") and record.get("threads_status") == "skipped_ig_sufficient":
+        return "Skipped (IG country)"
+    return theme.cell(record.get(field))
 
 
 def record_to_row(position: int, record: dict) -> tuple[str, ...]:
@@ -36,25 +66,28 @@ def record_to_row(position: int, record: dict) -> tuple[str, ...]:
     Returns:
         Cell values in ``COLUMNS`` order.
     """
-    joined = theme.cell(record.get("threads_date_joined"))
+    joined = metadata_cell(record, "threads_date_joined")
     if record.get("threads_badge"):
         joined = f"{joined} · {record['threads_badge']}"
     return (
         f"{position:02d}",
         f"@{record.get('username', '')}",
         theme.display_status(record),
-        theme.cell(record.get("ig_country")),
-        theme.cell(record.get("ig_date_joined")),
-        theme.cell(record.get("threads_country")),
+        str(record.get("data_quality", "Unknown")),
+        str(record.get("checker_id") or ""),
+        metadata_cell(record, "ig_country"),
+        metadata_cell(record, "ig_date_joined"),
+        metadata_cell(record, "threads_country"),
         joined,
         f"{float(record.get('seconds') or 0):.1f}s",
+        _error_cell(record.get("error_message")),
     )
 
 
 class DataTable(ctk.CTkFrame):
     """Scrollable, colour-coded results grid."""
 
-    def __init__(self, master: ctk.CTkBaseClass) -> None:
+    def __init__(self, master: ctk.CTkBaseClass, title: str = "Live Results") -> None:
         """Builds the table inside a surface-coloured frame."""
         super().__init__(master, fg_color=theme.BG_SURFACE, corner_radius=8)
         self.grid_columnconfigure(0, weight=1)
@@ -62,7 +95,7 @@ class DataTable(ctk.CTkFrame):
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=14, pady=(12, 8))
-        ctk.CTkLabel(header, text="Live Results", font=theme.FONT_SECTION,
+        ctk.CTkLabel(header, text=title, font=theme.FONT_SECTION,
                      text_color=theme.TEXT_PRIMARY).pack(side="left")
         self._summary = ctk.CTkLabel(header, text="", font=theme.FONT_CAPTION, text_color=theme.TEXT_MUTED)
         self._summary.pack(side="right")
@@ -75,11 +108,17 @@ class DataTable(ctk.CTkFrame):
             self.tree.column(key, width=width, minwidth=40, anchor=anchor, stretch=key != "idx")
         for status, (fg, bg) in theme.STATUS_COLORS.items():
             self.tree.tag_configure(status, foreground=fg, background=bg)
+        self.tree.tag_configure("INCOMPLETE", foreground=theme.STATUS_WARN, background="#383020")
+        self.tree.bind("<Double-1>", self._show_details)
 
         scrollbar = ctk.CTkScrollbar(self, command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scrollbar.set)
-        self.tree.grid(row=1, column=0, sticky="nsew", padx=(14, 0), pady=(0, 14))
-        scrollbar.grid(row=1, column=1, sticky="ns", padx=(2, 8), pady=(0, 14))
+        # Columns total ~920px; at the 950px minimum window width (theme.WINDOW_MIN_SIZE)
+        # the table area is well under that, so a horizontal scrollbar is required too.
+        h_scrollbar = ctk.CTkScrollbar(self, orientation="horizontal", command=self.tree.xview)
+        self.tree.configure(yscrollcommand=scrollbar.set, xscrollcommand=h_scrollbar.set)
+        self.tree.grid(row=1, column=0, sticky="nsew", padx=(14, 0), pady=(0, 0))
+        scrollbar.grid(row=1, column=1, sticky="ns", padx=(2, 8), pady=(0, 0))
+        h_scrollbar.grid(row=2, column=0, sticky="ew", padx=(14, 0), pady=(2, 14))
 
         self._counts: dict[str, int] = {}
         self.records: list[dict] = []
@@ -91,15 +130,36 @@ class DataTable(ctk.CTkFrame):
         self._counts.clear()
         self._summary.configure(text="")
 
+    def set_records(self, records: list[dict]) -> None:
+        """Replace table rows with a previously saved run."""
+        self.clear()
+        for record in records:
+            self.add_record(record)
+
     def add_record(self, record: dict) -> None:
         """Appends one finished account and scrolls it into view."""
         self.records.append(record)
         values = record_to_row(len(self.records), record)
         status = values[2]
-        item = self.tree.insert("", "end", values=values, tags=(status,))
+        tag = "INCOMPLETE" if status == "ACTIVE" and record.get("data_quality") not in ("Complete", "Status only") else status
+        item = self.tree.insert("", "end", values=values, tags=(tag,))
         self.tree.see(item)
         self._counts[status] = self._counts.get(status, 0) + 1
         self._summary.configure(text="   ".join(f"{k}: {v}" for k, v in sorted(self._counts.items())))
+
+    def _show_details(self, event: tk.Event) -> None:
+        """Show full errors, per-platform stages, checker and evidence paths."""
+        item = self.tree.identify_row(event.y)
+        if not item:
+            return
+        index = self.tree.index(item)
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Result details")
+        dialog.geometry("750x500")
+        textbox = ctk.CTkTextbox(dialog, wrap="word")
+        textbox.pack(fill="both", expand=True, padx=12, pady=12)
+        textbox.insert("1.0", json.dumps(self.records[index], indent=2, ensure_ascii=False))
+        textbox.configure(state="disabled")
 
     def _configure_style(self) -> None:
         """Applies the Cyber Dark palette to the ttk Treeview."""
