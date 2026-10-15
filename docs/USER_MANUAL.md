@@ -1,0 +1,228 @@
+# MetaInspector Desktop: User Manual
+
+What every button, column and value means. For installation and first-time
+login, see the Quick Start guide.
+
+---
+
+## 1. What the app does
+
+- Takes a list of Instagram usernames.
+- For each one, reports whether the account is **active, not found, banned or
+  private**.
+- Where the platform discloses it, also reports the **country the account is
+  based in** and the **month it joined**, for Instagram and for Threads.
+- Shows results live in a table while the run is going.
+- Lets you copy the results into Google Sheets, or save them as CSV or Excel.
+- Keeps a local history of past runs.
+
+**It never invents a value.** If something could not be read, the app says so
+instead of filling the cell with a guess.
+
+---
+
+## 2. The five checking modes
+
+Pick one on the left before pressing Start.
+
+### Combined (IG + Threads)
+
+- Checks **both** platforms for every account.
+- Gives the most data: IG country and joined date, Threads country, joined
+  date and badge.
+- **Slowest.** Measured between about **7 and 10 minutes** for 95 accounts.
+- This is the default.
+
+### Instagram Only
+
+- Checks Instagram only. Threads is not visited.
+- Gives IG status, country and joined date.
+- Measured between about **3.5 and 7 minutes** for 95 accounts.
+
+### Threads Only
+
+- Checks Threads only. Instagram is not visited.
+- Gives Threads status, country, joined date and badge.
+
+### Smart Combined (skip Threads when IG gives country)
+
+- Checks Instagram first. **If Instagram already gave a country, Threads is
+  skipped** for that account. If Instagram gave no country, Threads is checked
+  as a fallback.
+- **Recommended for most runs.** Measured at about **4 minutes** for 95
+  accounts, against 10 minutes for Combined on the same list.
+- **Accuracy is not reduced.** Where both platforms report a country they
+  agreed 36 times out of 36 in testing, and the accounts Threads rescues are
+  exactly the ones Instagram stayed silent on, which this mode still checks.
+- **What you give up:** Threads Joined and Threads Badge for the skipped
+  accounts. If you need those columns, use Combined.
+
+### IG Status Only (no login, fastest)
+
+- Checks **only whether the Instagram account exists**. Active, not found or
+  suspended.
+- **Needs no login at all.** No checker account, no setup step.
+- Measured at about **1 to 1.5 minutes** for 95 accounts.
+- **Cannot return country or joined date.** A logged-out Instagram page shows
+  no profile menu, so the transparency panel does not exist to read.
+
+---
+
+## 3. The left panel
+
+- **Input Usernames:** paste usernames, one per line. The count appears top
+  right of the box.
+- **Load .txt File:** import a plain text list instead of pasting.
+- **Checking Mode:** the five modes above.
+- **Parallel workers:** how many accounts are checked at the same time, 1 to
+  5. Five is the normal setting. This is **not** the number of login accounts;
+  one healthy login can drive all five.
+- **Dialog (s), default 10:** how long to wait for the transparency panel to
+  show its values before giving up on that account. Raise it if you see many
+  timeouts.
+- **Menu (s), default 8:** how long to wait for the profile menu to appear and
+  be clickable.
+- **Save debug captures:** writes screenshots and page text for every step
+  into a `debug` folder. Leave it **off** for normal use. Only turn it on when
+  investigating a problem.
+- **Start, Pause, Stop:** Pause suspends between accounts and resumes where it
+  left off. Stop ends the run and keeps whatever has been collected.
+
+---
+
+## 4. The results table
+
+| Column | What it means |
+| --- | --- |
+| **#** | Row number in the order results arrived. |
+| **Username** | The account checked. |
+| **Status** | The overall verdict. See section 5. |
+| **Data** | How complete this row is. See section 6. |
+| **Checker** | Which login account did the work. Empty in IG Status Only. |
+| **IG Country** | The country Instagram says the account is based in. |
+| **IG Joined** | The month and year the Instagram account was created. |
+| **Threads Country** | The same, from Threads. |
+| **Threads Joined** | Joined month from Threads, plus the follower badge. |
+| **Duration** | Seconds spent on this account. |
+| **Error** | The reason something is missing, when there is one. |
+
+---
+
+## 5. Status values
+
+- **ACTIVE:** the account exists and is reachable.
+- **NOT_FOUND:** the account does not exist, or was deleted or removed.
+- **BANNED:** the account is suspended.
+- **ERROR:** the check could not be completed. The account may well be fine.
+  Re-run those rows. See section 8.
+- **BLOCKED:** your own login account hit a security check. Stop and resolve
+  the login before continuing.
+- **UNKNOWN:** IG Status Only could not find a clear marker on the page. It
+  means "not sure", not "does not exist".
+
+---
+
+## 6. The Data column
+
+- **Complete:** everything the chosen mode asked for was collected.
+- **Partial:** some of it was collected. The Error column says what is missing.
+- **Not available:** the account does not exist, so there is nothing to
+  collect. This is a correct result, not a failure.
+- **Status only:** an IG Status Only row with a clear verdict.
+
+---
+
+## 7. Why a cell is empty or says N/A
+
+This is the most common question. **An empty cell has three different causes**,
+and the app records which one applies.
+
+1. **The account has no Threads profile.** Most Instagram users never created
+   one. In a 95-account test, **42 had no Threads account at all.** Both
+   Threads columns are empty and that is the correct answer.
+2. **The platform has the profile but will not show the country.** Either the
+   country line is not displayed, or it literally reads "Not shared". In the
+   same test this was **13 accounts**. You can spot these easily: **Threads
+   Joined has a value while Threads Country is empty.** If extraction had
+   failed, both would be empty.
+3. **The check did not complete.** Menu or panel did not render in time. In the
+   same test this was **8 accounts**. The Error column says so.
+
+**To see which one applies per row,** click **Select Output** and tick:
+
+- `Threads Status`
+- `Threads Country Availability`
+- `Error`
+
+The default six columns do not include these, which is why the reason looks
+hidden.
+
+---
+
+## 8. Things that look like bugs but are not
+
+- **An account was ACTIVE yesterday and is NOT_FOUND today.** These lists
+  decay. In one measured day, **2 of 95 accounts were deleted.** Re-running
+  will legitimately give different numbers.
+- **A row says ERROR but the account opens fine in a browser.** Transient
+  failures happen at a rate of roughly **2 in 95**. The app reports ERROR
+  rather than guessing. Re-run those rows.
+- **Country is blank but joined date is filled.** The platform withheld the
+  country. See section 7, cause 2.
+- **The same list takes 7 minutes once and 10 minutes another time.** Meta's
+  own page speed varies by time of day. The transparency panel was measured
+  running twice as slow near midnight as in the afternoon.
+- **IG Status Only shows several UNKNOWN rows at the start of a run.** Known
+  issue in this build: the first batch races a cold browser cache. Re-run
+  those rows and they normally resolve.
+
+---
+
+## 9. Getting results out
+
+- **Copy for Google Sheets:** copies the table to the clipboard. Paste into
+  Sheets with Ctrl+V and it lands in separate columns. Always copies the clean
+  six columns.
+- **Export CSV / Export Excel:** saves a file. File exports include extra
+  diagnostic columns beyond the six.
+- **Select Output:** choose which of the **14 available columns** you want.
+  The selection applies to clipboard, CSV and Excel alike, and is remembered
+  after you close the app. Unticking everything still keeps Username and
+  Status.
+- **View Run History:** past runs are stored locally. Open one to see its date,
+  mode and account count, and copy that batch again.
+
+Available columns: Username, Status, IG Country, IG Joined, Threads Country,
+Threads Joined, Threads Badge, Data Quality, IG Status, Threads Status,
+Seconds, Error, IG Country Availability, Threads Country Availability.
+
+---
+
+## 10. Limits you should know
+
+- **Country and joined date always require a logged-in checker account.**
+  Only the status check works logged out.
+- **Smart Combined does not collect Threads Joined or Threads Badge** for
+  accounts it skips.
+- **A completely empty Threads profile** (no posts, no followers) sometimes
+  shows no About control at all, so no data can be read from it. Measured at
+  1 failure in 149 platform checks.
+- **The pause between accounts is deliberate.** It exists to avoid rate limits
+  and account suspensions. It accounts for a large share of the run time and
+  should not be removed casually.
+- **The app is not code-signed.** Windows SmartScreen will warn on first
+  launch. This is expected for an unsigned program.
+
+---
+
+## 11. If something goes wrong
+
+- **Many rows time out:** raise Dialog (s) to 15 and Menu (s) to 12, then
+  re-run the failed rows.
+- **Status says BLOCKED:** your checker login hit a security challenge. Open
+  Setup Checker Account, log in again, clear the challenge, then re-run.
+- **Header says no login saved:** run Setup Checker Account. Not needed for
+  IG Status Only.
+- **The whole run is slow:** check the time of day, and prefer Smart Combined.
+- **Investigating a specific account:** turn on Save debug captures, run only
+  that username, and send the resulting `debug` folder files.
