@@ -64,3 +64,29 @@ def test_status_only_table_explains_absent_fields() -> None:
     assert row["ig_country"] == row["ig_joined"] == "Unavailable (status only)"
     assert row["threads_country"] == row["threads_joined"] == "Not checked"
     assert row["checker"] == ""
+
+
+def test_small_window_keeps_input_and_controls_reachable(
+    gui_root: MetaInspectorApp,
+) -> None:
+    """At minimum height, scrolling exposes controls without collapsing input."""
+    app = gui_root
+    app.geometry("950x600")
+    app.update()
+    panel = app.left_panel
+    canvas = panel._parent_canvas
+    canvas.yview_moveto(0)
+    app.update()
+    assert panel.textbox.winfo_height() >= 100
+    assert panel.textbox.winfo_rooty() >= canvas.winfo_rooty()
+    panel.textbox.insert("1.0", "fixture")
+    assert panel.usernames() == ["fixture"]
+    canvas.yview_moveto(1)
+    app.update()
+    top = canvas.winfo_rooty()
+    bottom = top + canvas.winfo_height()
+    for control in (panel.start_button, panel.pause_button, panel.stop_button):
+        assert top <= control.winfo_rooty()
+        assert control.winfo_rooty() + control.winfo_height() <= bottom
+    panel.textbox.delete("1.0", "end")
+    canvas.yview_moveto(0)

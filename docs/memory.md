@@ -328,3 +328,21 @@ session. Exact continuation-button mismatch and health-route classification were
 fixed with regressions, but a fresh healthy target-menu capture and the 100-target
 benchmark are gated on restored login. The supplied list has 95 unique targets.
 See [Round 3 report](implementation/round3-report.md) and [test log](test_log.md).
+
+
+### Packaged delivery follow-up (2026-10-15)
+
+Continued feature/targeted-check-modes after committed reporting/classifier
+fixes in 8e4b066. Actual EXE inspection reproduced collapsed username input
+and clipped Start at 150 percent scaling. The left panel now scrolls; the
+final suite passed 279 tests in 69.20s. Rebuilt and actually operated the
+final EXE: 325,044,156 bytes. Setup launched the _MEI bundled Chromium and
+live-verified Checker 5 on both platforms. Anonymous 2-target run: 10.98s,
+2 Status only, no checker/error. Smart 2-target run: 12.89s, 2 Complete,
+2 Threads skips, no errors. Actual selected TSV/CSV/XLSX matched; history,
+re-copy, settings/history restart and file import worked. These small samples
+are not new 95/100-account benchmarks. No clean physical Windows machine is
+available; TSK-502 stays unchecked. PRD, task evidence, five-mode illustrated
+Quick Start and the operator checklist now match the measured delivery.
+No merge into dev, branch deletion or binary commit. See
+[BL-01 evidence and limits](implementation/bl01-packaged-verification.md).

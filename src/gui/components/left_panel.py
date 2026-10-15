@@ -31,7 +31,7 @@ MODE_LABELS = (
 WORKER_CHOICES = ("1", "2", "3", "4", "5")
 
 
-class LeftPanel(ctk.CTkFrame):
+class LeftPanel(ctk.CTkScrollableFrame):
     """Collects usernames and mode, and exposes Start / Pause / Stop."""
 
     def __init__(
@@ -51,9 +51,7 @@ class LeftPanel(ctk.CTkFrame):
             on_stop: Called when Stop is clicked.
         """
         super().__init__(master, width=theme.LEFT_PANEL_WIDTH, fg_color=theme.BG_SURFACE, corner_radius=0)
-        self.grid_propagate(False)
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 6))
@@ -63,7 +61,7 @@ class LeftPanel(ctk.CTkFrame):
                                          text_color=theme.TEXT_MUTED)
         self._count_label.pack(side="right")
 
-        self.textbox = ctk.CTkTextbox(self, font=theme.FONT_BODY, fg_color=theme.BG_ELEVATED,
+        self.textbox = ctk.CTkTextbox(self, height=130, font=theme.FONT_BODY, fg_color=theme.BG_ELEVATED,
                                       border_color=theme.BORDER_COLOR, border_width=1,
                                       text_color=theme.TEXT_PRIMARY)
         self.textbox.grid(row=1, column=0, sticky="nsew", padx=16)

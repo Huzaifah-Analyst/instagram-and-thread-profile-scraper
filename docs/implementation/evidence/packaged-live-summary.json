@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-15",
+  "exe_bytes": 325044156,
+  "exe_sha256": "e7a8c13b7b3c94fcfd79534d13d0e9a92cd86f506b72b74aca2285229cf68247",
+  "runs": [
+    {
+      "mode": "ig_status_only",
+      "targets_returned": 2,
+      "elapsed_seconds": 10.98,
+      "ig_status_counts": {
+        "active": 2
+      },
+      "quality_counts": {
+        "Status only": 2
+      },
+      "error_rows": 0,
+      "unstarted": 0,
+      "active_checkers": [],
+      "threads_skip_count": 0
+    },
+    {
+      "mode": "combined_smart",
+      "targets_returned": 2,
+      "elapsed_seconds": 12.89,
+      "ig_status_counts": {
+        "active": 2
+      },
+      "quality_counts": {
+        "Complete": 2
+      },
+      "error_rows": 0,
+      "unstarted": 0,
+      "active_checkers": [
+        "checker_5"
+      ],
+      "threads_skip_count": 2
+    }
+  ],
+  "full_benchmark": false,
+  "clean_machine_test": false
+}

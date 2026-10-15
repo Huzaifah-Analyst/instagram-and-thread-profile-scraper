@@ -375,3 +375,14 @@ without crashing).
 - P84: module-scoped root reuse still failed during triple collection (17 passed, 7 setup errors). Session-scoped reuse plus a subprocess for actual restart verification passed all 24 repeated tests, preserving assertions.
 - Final full suite: 278 passed in 73.10s, zero skips. Combined record comparison against 665f2bf: 5,184 synthetic pairs, zero differences. No live benchmark in this task; P81 remains the independent review's measurement.
 - [Changes, evidence and limits](implementation/round12-review-fixes.md).
+
+
+## Packaged delivery follow-up (15 October 2026)
+
+| ID | State | Evidence and action |
+| --- | --- | --- |
+| P85 | Fixed / rebuilt EXE verified | At 150 percent Windows scaling, the first rebuilt GUI collapsed username input and clipped Start. A scrollable left panel retains input height and exposes Start/Pause/Stop. Actual minimum-size Tk regression passes; final 279-test suite green. Final rebuilt EXE completed two anonymous and two Smart targets, with all seven BL-01 checks recorded. |
+| P86 | Known delivery deviation / external acceptance pending | Final EXE is 325,044,156 bytes, above the original 150 MB target because full Chromium and runtime dependencies are bundled. Bare physical Windows testing remains unperformed; TSK-502/BL-02 unchecked with operator checklist. |
+
+[Actual build checks, timings and limits](implementation/bl01-packaged-verification.md).
+No new full-list benchmark or proof of other physical display configurations.

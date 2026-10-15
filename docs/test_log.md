@@ -161,3 +161,14 @@
 - Final full suite: 278 passed in 73.10s, zero skips.
 - Complete Combined records matched the parent builder on 5,184 synthetic input pairs; zero differences. No live platform requests or benchmark in this task.
 - [Report and raw outputs](implementation/round12-review-fixes.md).
+
+
+## Packaged delivery acceptance (15 October 2026)
+
+- D1-D3 committed in 8e4b066 with 278 passing tests before packaging.
+- First actual EXE inspection reproduced input collapse and clipped Start at 150 percent scaling. Changed left controls to scrollable layout and rebuilt.
+- Targeted actual Tk checks: 12 passed in 17.87s. Final full suite: 279 passed in 69.20s, zero skips. Outputs in implementation/evidence/packaging-*.txt.
+- Actual final EXE anonymous batch: 2/2 Active, Status only, 10.98s, no errors or active checker. Actual Smart batch: 2/2 Complete, 12.89s, two intentional Threads skips, no errors/unstarted. Only Checker 5 used after anonymous run finished; setup verified IG and Threads from the bundled browser.
+- EXE TSV/CSV/XLSX parity: same 13 selected headers and two rows, empty errors; actual history selection/re-copy and restart persistence verified. Text-file import loaded two usernames.
+- Final binary: 325,044,156 bytes; dist/build ignored and not committed. No clean-machine test, full-list benchmark, online Sheets paste or Excel application opening claimed.
+- [Seven checks and complete limits](implementation/bl01-packaged-verification.md).

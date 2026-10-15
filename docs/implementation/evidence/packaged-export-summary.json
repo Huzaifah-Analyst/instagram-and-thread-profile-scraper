@@ -1,0 +1,21 @@
+{
+  "headers": [
+    "Username",
+    "Status",
+    "IG Joined",
+    "Threads Country",
+    "Threads Joined",
+    "Threads Badge",
+    "Data Quality",
+    "IG Status",
+    "Threads Status",
+    "Seconds",
+    "Error",
+    "IG Country Availability",
+    "Threads Country Availability"
+  ],
+  "data_rows": 2,
+  "tsv_csv_xlsx_equal": true,
+  "clean_error_cells": 2,
+  "complete_rows": 2
+}
