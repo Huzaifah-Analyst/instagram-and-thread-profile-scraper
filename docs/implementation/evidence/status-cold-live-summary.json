@@ -1,0 +1,64 @@
+{
+  "targets": 50,
+  "sha256": "9e722287031e782332a132e0378379e0ee91bfcaa6a649c9441747b234ef0a5f",
+  "runs": {
+    "before": {
+      "records": 50,
+      "unique": 50,
+      "exact_target_set": true,
+      "statuses": {
+        "active": 45,
+        "not_found": 5
+      },
+      "read_errors": 0,
+      "summary_line": "50 accounts in 37.1s | assets blocked: 145",
+      "unknown": 0,
+      "over_10_seconds": 0,
+      "max_target_seconds": 6.61
+    },
+    "after": {
+      "records": 50,
+      "unique": 50,
+      "exact_target_set": true,
+      "statuses": {
+        "active": 45,
+        "not_found": 5
+      },
+      "read_errors": 0,
+      "summary_line": "50 accounts in 125.7s | assets blocked: 151",
+      "unknown": 0,
+      "over_10_seconds": 24,
+      "max_target_seconds": 24.41
+    }
+  },
+  "after_passes": [
+    {
+      "event": "anonymous_main_pass",
+      "unknown_count": 0,
+      "timeout_s": 30.0
+    },
+    {
+      "event": "anonymous_retry_pass",
+      "attempts": 0,
+      "unknown_count": 0
+    }
+  ],
+  "after_journal": "run_20261015_141419_232108.jsonl",
+  "artifact": {
+    "path": "dist/MetaInspectorDesktop.exe",
+    "bytes": 325048557,
+    "sha256": "65a2d5f09a3249e97ed0c1bd639bf625d88426727429f4f89faaee5313d5b392",
+    "rebuilt": true,
+    "runtime_retested": false
+  },
+  "verification_limits": [
+    "CLI runs, not packaged 50-target runs",
+    "Client cold-start Unknown pattern not reproduced",
+    "Warm retry not exercised live: no first-pass Unknowns",
+    "After run slower; no speed improvement established",
+    "No new Combined run, checker login or clean-machine test"
+  ],
+  "date": "2026-10-15",
+  "base_commit": "0e555b1",
+  "branch": "fix/status-clarity-and-cold-start"
+}

@@ -68,6 +68,13 @@ IG Status Only cannot return country or join date: a logged-out Instagram
 profile page exposes no About control at all. Its cells show **Unavailable
 (status only)**. It uses no checker login and no logged-in-account pacing.
 Unknown is an inconclusive read, not proof that an account is missing.
+Each anonymous attempt allows at least 30 seconds for a decision marker.
+Unknown targets receive one automatic retry after the main pass with the
+same warm context. If still Unknown, the Error field keeps the read reason.
+On 15 October 2026, a 50-target CLI comparison returned 0 Unknown before and
+after, in 37.1s and 125.7s. This did not reproduce the client's packaged
+cold-start failure or establish a speed improvement. See the
+[current fix report](implementation/status-clarity-and-cold-start.md).
 
 Independent Round 11 measurements on a **95-account list** were Combined
 **596.3s**, Smart Combined **225.2s**, and IG Status Only **62.4s**.
@@ -88,8 +95,13 @@ Threads Badge for skipped targets; choose Combined when you need those too.
 5. Inspect **Data Quality** and **Error**, not only ACTIVE. ACTIVE alone does
    not guarantee complete country/date extraction. Intentional skips and
    successful status-only checks have no error text. Real read failures do.
-6. A country can be **Not shared** or unavailable because the platform does
-   not disclose it. Missing information is not filled with a guessed value.
+6. Missing country/date cells explain their state: **Not checked** for an
+   excluded platform, **Skipped (IG country)** for a Smart omission, and
+   **No account** for a not-found profile. **Not shown by platform** means the
+   country row was absent; **Not shared** preserves the platform's words.
+   Failures show short stage labels such as **Menu not found** or **Panel
+   incomplete**, with full details in Error. An unexplained value stays N/A.
+   See [the manual](USER_MANUAL.md#7-what-missing-value-labels-mean).
 
 ## 5. Choose and copy output
 
@@ -110,6 +122,9 @@ Threads Badge for skipped targets; choose Combined when you need those too.
 
 - **Export CSV** and **Export Excel** open a Save dialog. Choose a writable
   folder and filename. Both use the same selected columns as clipboard output.
+- Missing-value labels describe the table only; raw exported country/date
+  values stay unchanged. Select Status, Country Availability and Error columns
+  when exported reasons are needed.
 - Formula-like text is exported as text rather than executable spreadsheet
   formulas. Close an existing workbook before overwriting it.
 - **View Run History** opens saved finished or stopped GUI runs. Select a run

@@ -172,3 +172,27 @@
 - EXE TSV/CSV/XLSX parity: same 13 selected headers and two rows, empty errors; actual history selection/re-copy and restart persistence verified. Text-file import loaded two usernames.
 - Final binary: 325,044,156 bytes; dist/build ignored and not committed. No clean-machine test, full-list benchmark, online Sheets paste or Excel application opening claimed.
 - [Seven checks and complete limits](implementation/bl01-packaged-verification.md).
+
+
+## Status clarity and anonymous cold-start (15 October 2026)
+
+- Branch fix/status-clarity-and-cold-start from dev 0e555b1.
+- First focused run: 1 failed, 60 passed in 2.21s, caused by the new test's
+  journal-event ordering assumption. Corrected event filtering; no assertions
+  removed. Corrected focused run: 62 passed in 0.92s.
+- Initial full suite: 339 passed in 79.61s. After PEP 8 cleanup and stronger
+  exact-once journal assertions: 339 passed in 78.08s, zero skips.
+- Real anonymous CLI, same 50 unique targets and five workers: baseline
+  37.1s, fixed source 125.7s. Both: 45 Active, 5 Not found, 0 Unknown/read
+  errors, exact returned-target equality. No first-pass Unknown in fixed run,
+  so live retry recovery was not exercised. Network conditions uncontrolled.
+- Preliminary EXE attempt did not start checking; earlier CLI attempt stopped
+  after five records without a terminal journal. Neither counts as a complete
+  benchmark. Baseline rerun completed all 50.
+- Synthetic regressions verify retry ordering/bounds, persistent Unknown,
+  exceptions, pause/stop-compatible scheduling, unique progress/journal rows,
+  longer anonymous budget and unchanged Combined default budget. Cell tests
+  cover both platforms and date/country fields, original values and CSV parity.
+- PyInstaller rebuild succeeded. New EXE runtime/clean-machine acceptance and
+  client cold-start reproduction remain unverified. No logged-in batch ran.
+- [Report and evidence](implementation/status-clarity-and-cold-start.md).

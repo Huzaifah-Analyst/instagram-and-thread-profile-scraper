@@ -1,0 +1,56 @@
+F............................................................            [100%]
+================================== FAILURES ===================================
+______________ test_retry_waits_for_main_pass_and_publishes_once ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001464A3B1700>
+tmp_path = WindowsPath('C:/Users/huzai/AppData/Local/Temp/pytest-of-huzai/pytest-119/test_retry_waits_for_main_pass0')
+
+    def test_retry_waits_for_main_pass_and_publishes_once(
+        monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    ) -> None:
+        """Unknowns get one warm attempt; successful verdicts are never retried."""
+        context = fake_browser(monkeypatch)
+        seen: list[tuple[int, int, dict]] = []
+        events: list[dict] = []
+        users = ["cold", "persistent", "ready", "missing", "last"]
+        calls: Counter[str] = Counter()
+        scraper = MultiWorkerScraper(
+            mode="ig_status_only", workers=2, resource_blocker_enabled=False,
+            profile_dir=tmp_path / "unused", progress_callback=lambda *args: seen.append(args),
+        )
+        monkeypatch.setattr(scraper, "_save_event", events.append)
+        pacing = AsyncMock(side_effect=AssertionError("No account pacing"))
+        monkeypatch.setattr(scraper, "_interruptible_sleep", pacing)
+
+        async def check(page: object, username: str, timeout_s: float) -> dict:
+            """Simulate cold recovery and a genuinely unresolved warm page."""
+            calls[username] += 1
+            assert timeout_s == ANONYMOUS_PAGE_READY_TIMEOUT_S > 10
+            if calls[username] == 2:
+                assert set(calls) == set(users), "Retry started before main pass finished"
+            await asyncio.sleep(0)
+            if username == "persistent" or (username == "cold" and calls[username] == 1):
+                return status_record(username, "unknown", "No marker on this attempt", .25)
+            status = "not_found" if username == "missing" else "active"
+            return status_record(username, status, "", .25)
+
+        monkeypatch.setattr("src.core.anonymous_status.check_status", check)
+        records = scraper.run(users)
+        assert [row["username"] for row in records] == users
+        assert calls == Counter(cold=2, persistent=2, ready=1, missing=1, last=1)
+        assert records[0]["ig_status"] == "active"
+        assert records[0]["error_message"] is None
+        assert records[0]["seconds"] == .5
+        assert records[1]["ig_status"] == "unknown"
+        assert records[1]["error_message"] == "No marker on this attempt"
+        assert [item[0] for item in seen] == [1, 2, 3, 4, 5]
+        assert len({item[2]["username"] for item in seen}) == 5
+        assert scraper._done == 5 and scraper.unstarted_usernames == []
+>       assert events[0]["unknown_count"] == 2
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'unknown_count'
+
+tests\test_anonymous_cold_start.py:76: KeyError
+=========================== short test summary info ===========================
+FAILED tests/test_anonymous_cold_start.py::test_retry_waits_for_main_pass_and_publishes_once
+1 failed, 60 passed in 2.21s

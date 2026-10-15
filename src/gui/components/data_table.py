@@ -47,13 +47,42 @@ def _error_cell(error_message: object) -> str:
     return text
 
 
+_FAILED_STAGES = {
+    "navigate": "Page not loaded",
+    "identity": "Identity unverified",
+    "profile_menu": "Menu not found",
+    "about_menu": "About unavailable",
+    "about_dialog": "Panel incomplete",
+}
+
+
 def metadata_cell(record: dict, field: str) -> str:
-    """Explain unrequested fields without fabricating underlying record values."""
-    if record.get("checking_mode") == "ig_status_only":
-        return "Unavailable (status only)" if field.startswith("ig_") else "Not checked"
-    if field.startswith("threads_") and record.get("threads_status") == "skipped_ig_sufficient":
+    """Explain empty metadata from structured state; preserve raw data."""
+    value = record.get(field)
+    if value is not None and value != "":
+        return theme.cell(value)
+    platform = "ig" if field.startswith("ig_") else "threads"
+    mode = record.get("checking_mode")
+    status = record.get(f"{platform}_status")
+    if mode == "ig_status_only":
+        return (
+            "Unavailable (status only)" if platform == "ig" else "Not checked"
+        )
+    if platform == "threads" and status == "skipped_ig_sufficient":
         return "Skipped (IG country)"
-    return theme.cell(record.get(field))
+    if (status == "skipped" or (mode == "ig_only" and platform == "threads")
+            or (mode == "threads_only" and platform == "ig")):
+        return "Not checked"
+    availability = record.get(f"{platform}_country_availability")
+    if status == "not_found" and availability is None:
+        return "No account"
+    if field.endswith("_country") and availability == "not_disclosed":
+        return "Not shown by platform"
+    stage = record.get(f"{platform}_stage")
+    if (status == "error" or (stage and stage != "complete"
+                              and record.get("error_message"))):
+        return _FAILED_STAGES.get(stage, "Check failed")
+    return theme.cell(value)
 
 
 def record_to_row(position: int, record: dict) -> tuple[str, ...]:

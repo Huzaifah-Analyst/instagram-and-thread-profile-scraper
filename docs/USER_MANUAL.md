@@ -125,37 +125,46 @@ Pick one on the left before pressing Start.
 ## 6. The Data column
 
 - **Complete:** everything the chosen mode asked for was collected.
-- **Partial:** some of it was collected. The Error column says what is missing.
+- **Partial:** some of it was collected. Cell labels explain missing values;
+  the Error column contains actual check failures, if any.
 - **Not available:** the account does not exist, so there is nothing to
   collect. This is a correct result, not a failure.
 - **Status only:** an IG Status Only row with a clear verdict.
 
 ---
 
-## 7. Why a cell is empty or says N/A
+## 7. What missing-value labels mean
 
-This is the most common question. **An empty cell has three different causes**,
-and the app records which one applies.
+The live table and reopened history explain missing country and joined-date
+values in their own cells. These labels apply to both Instagram and Threads.
 
-1. **The account has no Threads profile.** Most Instagram users never created
-   one. In a 95-account test, **42 had no Threads account at all.** Both
-   Threads columns are empty and that is the correct answer.
-2. **The platform has the profile but will not show the country.** Either the
-   country line is not displayed, or it literally reads "Not shared". In the
-   same test this was **13 accounts**. You can spot these easily: **Threads
-   Joined has a value while Threads Country is empty.** If extraction had
-   failed, both would be empty.
-3. **The check did not complete.** Menu or panel did not render in time. In the
-   same test this was **8 accounts**. The Error column says so.
+| Cell label | Meaning |
+| --- | --- |
+| **Not checked** | The selected mode did not visit this platform. |
+| **Skipped (IG country)** | Smart Combined already obtained a real IG country, so Threads was skipped. |
+| **Unavailable (status only)** | Logged-out IG Status Only cannot collect country or joined date. |
+| **No account** | This platform returned not found, with no country-availability state. |
+| **Not shown by platform** | The country row was absent from the platform's panel. This label describes country, not a missing date. |
+| **Not shared** | The platform literally displayed these words. |
+| **Page not loaded** | The check failed at the navigation stage. |
+| **Identity unverified** | The intended profile could not be verified. |
+| **Menu not found** | The check failed while opening the profile menu. |
+| **About unavailable** | The check failed while finding or clicking the About menu item. |
+| **Panel incomplete** | The About panel did not return this value. |
+| **Check failed** | A failure was recorded without one of the stages above. |
+| **N/A** | The stored fields do not explain the missing value. No cause is guessed. |
 
-**To see which one applies per row,** click **Select Output** and tick:
+A country can be withheld while the date is available. A failed check can also
+return some values, so blank country plus a populated date alone does not
+prove why the country is missing. Read the cell label and full **Error** text.
 
-- `Threads Status`
-- `Threads Country Availability`
-- `Error`
-
-The default six columns do not include these, which is why the reason looks
-hidden.
+These are **display labels only**. Clipboard, CSV and Excel retain the original
+field values and existing empty-value representation; labels are not written
+into missing country/date fields. For exported reasons, use **Select Output**
+and tick **IG Status**, **Threads Status**, the relevant **Country Availability**
+columns, and **Error**. Diagnostics are optional. A raw `not_disclosed` means
+the country row was not shown, while `not_shared` means the platform printed
+"Not shared".
 
 ---
 
@@ -167,24 +176,29 @@ hidden.
 - **A row says ERROR but the account opens fine in a browser.** Transient
   failures happen at a rate of roughly **2 in 95**. The app reports ERROR
   rather than guessing. Re-run those rows.
-- **Country is blank but joined date is filled.** The platform withheld the
-  country. See section 7, cause 2.
+- **Country is missing but joined date is filled.** Read the country cell's
+  label. **Not shown by platform** and **Not shared** indicate disclosure
+  limits; a stage failure label indicates a read failure. See section 7.
 - **The same list takes 7 minutes once and 10 minutes another time.** Meta's
   own page speed varies by time of day. The transparency panel was measured
   running twice as slow near midnight as in the afternoon.
-- **IG Status Only shows several UNKNOWN rows at the start of a run.** Known
-  issue in this build: the first batch races a cold browser cache. Re-run
-  those rows and they normally resolve.
+- **IG Status Only shows UNKNOWN.** It now allows at least 30 seconds per
+  attempt and retries Unknown once after the main pass, using the same warm
+  browser context. Persistent Unknown keeps its reason in Error, with no
+  guessed verdict. On 15 October 2026, a 50-target CLI comparison returned
+  **0 Unknown before and 0 after**, taking **37.1s and 125.7s** respectively.
+  The client's earlier **26 Unknown out of 95 in the EXE** was not reproduced;
+  no packaged cold-start resolution or speed improvement is established.
+  If Unknown remains after its automatic retry, check connectivity and retry
+  later. [Measurement and limits](implementation/status-clarity-and-cold-start.md).
 
 ---
 
 ## 9. Getting results out
 
 - **Copy for Google Sheets:** copies the table to the clipboard. Paste into
-  Sheets with Ctrl+V and it lands in separate columns. Always copies the clean
-  six columns.
-- **Export CSV / Export Excel:** saves a file. File exports include extra
-  diagnostic columns beyond the six.
+  Sheets with Ctrl+V and it lands in separate columns using Select Output.
+- **Export CSV / Export Excel:** saves a file with the same selected columns.
 - **Select Output:** choose which of the **14 available columns** you want.
   The selection applies to clipboard, CSV and Excel alike, and is remembered
   after you close the app. Unticking everything still keeps Username and

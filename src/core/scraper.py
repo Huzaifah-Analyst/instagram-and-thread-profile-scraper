@@ -288,9 +288,11 @@ class MultiWorkerScraper:
     async def _check_account(self, page: Page, username: str) -> dict:
         """Runs the extractors required by the current mode for one account."""
         if self.mode == MODE_IG_STATUS_ONLY:
-            from src.core.anonymous_status import check_status
+            from src.core.anonymous_status import anonymous_timeout_s, check_status
 
-            return await check_status(page, username, self.page_ready_timeout_s)
+            return await check_status(
+                page, username, anonymous_timeout_s(self.page_ready_timeout_s),
+            )
         t0 = time.monotonic()
         ig = empty_platform_result()
         threads = empty_platform_result()
