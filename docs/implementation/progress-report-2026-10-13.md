@@ -1,3 +1,10 @@
+> **Latest update, 17 October 2026:** Checking Mode presets removed; What to
+> Check now controls matching Live Results columns, including separate IG
+> Alive and Threads Alive. 449 tests pass. Saved 95-row replay verified 190
+> status cells with zero mismatches. No fresh speed benchmark. See the
+> [current report](2026-10-17-checks-and-live-columns.md). Older reports below
+> retain their historical measurements.
+
 > **Latest update, 17 October 2026:** individual What to Check cards, field
 > export presets, Alive row filters and live snapshot exports implemented.
 > Full suite: 427 passed. See the

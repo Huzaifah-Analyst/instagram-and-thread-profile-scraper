@@ -254,7 +254,8 @@ async def _extract(
         if debug_dump:
             _write_debug_dump(platform, username, captured)
             result["evidence"] = await capture_page(page, platform, username, result["stage"])
-        await _dismiss(page)
+        if requested_fields != ():
+            await _dismiss(page)
         result["seconds"] = round(time.monotonic() - started, 2)
     return result
 

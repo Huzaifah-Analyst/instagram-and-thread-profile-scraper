@@ -7,6 +7,7 @@ import customtkinter as ctk
 import pytest
 
 from src.core.anonymous_status import status_record
+from src.core.check_plan import CHECK_NAMES
 from src.gui.app import MetaInspectorApp
 from src.gui.components.data_table import COLUMNS, record_to_row
 
@@ -19,10 +20,12 @@ def gui_root(tmp_path_factory: pytest.TempPathFactory) -> Iterator[MetaInspector
     app.destroy()
 
 
-@pytest.mark.parametrize("mode", ["combined_smart", "ig_status_only"])
+@pytest.mark.parametrize("mode,checks", [
+    ("combined", CHECK_NAMES), ("ig_status_only", ("ig_alive",)),
+])
 def test_gui_forwards_new_mode_unchanged(gui_root: MetaInspectorApp, monkeypatch: pytest.MonkeyPatch,
-                                       mode: str) -> None:
-    """Actual radios feed Start and the production factory without new defaults."""
+                                       mode: str, checks: tuple[str, ...]) -> None:
+    """Only checkboxes feed Start and the production session strategy."""
     app = gui_root
     try:
         app.update()
@@ -32,11 +35,12 @@ def test_gui_forwards_new_mode_unchanged(gui_root: MetaInspectorApp, monkeypatch
                 """An anonymous mode must not require valid checker configuration."""
                 raise AssertionError("Checker configuration accessed")
             monkeypatch.setattr(app.checker_store, "load", reject_checker_load)
-        button = next(b for b in app.left_panel._mode_buttons if b.cget("value") == mode)
-        button.invoke()
+        app.left_panel.checks_panel.set_selection(checks)
+        app.left_panel._checks_changed()
         assert app.left_panel.mode == mode
         engine = app._default_factory(mode, lambda *_: None)
         assert engine.mode == mode
+        assert engine.checks == checks
         assert engine.workers == app.left_panel.workers
         seen: list[str] = []
         monkeypatch.setattr(app.bridge, "start", lambda users, selected: seen.append(selected))
@@ -52,7 +56,7 @@ def test_gui_forwards_new_mode_unchanged(gui_root: MetaInspectorApp, monkeypatch
         assert "Parallel workers" in captions
         assert "Checker limit" not in captions
     finally:
-        app.left_panel.mode_var.set("combined")
+        app.left_panel.checks_panel.set_selection(CHECK_NAMES)
         app.left_panel.textbox.delete("1.0", "end")
 
 

@@ -1,0 +1,30 @@
+{
+  "source": "run_20261017_145021_527066.jsonl",
+  "source_kind": "existing user-run journal",
+  "saved_wall_seconds": 300.06,
+  "rows_replayed": 95,
+  "ig_status": {
+    "not_found": 10,
+    "active": 85
+  },
+  "threads_status": {
+    "not_found": 47,
+    "active": 48
+  },
+  "status_cells_verified": 190,
+  "status_cell_mismatches": 0,
+  "record_errors": 0,
+  "visible_columns": [
+    "idx",
+    "username",
+    "ig_status",
+    "threads_status",
+    "quality",
+    "duration",
+    "error"
+  ],
+  "summary_label": "IG: 85 ACTIVE, 10 NOT FOUND | Threads: 48 ACTIVE, 47 NOT FOUND",
+  "row_seconds_sum": 757.64,
+  "row_seconds_mean": 7.975157894736842,
+  "fresh_live_run": false
+}

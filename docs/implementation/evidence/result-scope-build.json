@@ -1,0 +1,16 @@
+{
+  "exe": "dist\\updated\\MetaInspectorDesktop.exe",
+  "size": 325066271,
+  "sha256": "6f53235f86f77e2be477b7017fcfcbf563e68ed174413feaa38776c741bf9e6a",
+  "full_suite": {
+    "passed": 449,
+    "seconds": 84.77,
+    "skips": 0
+  },
+  "production_files": 48,
+  "largest_production_file_lines": 460,
+  "new_function_annotation_docstring_issues": [],
+  "added_forbidden_dashes": 0,
+  "exe_visual_launch": "passed; isolated app data, no browser or live check",
+  "preview_closed": true
+}

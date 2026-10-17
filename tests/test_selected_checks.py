@@ -126,7 +126,8 @@ def test_extractor_ignores_unrequested_panels_and_fields(
     monkeypatch.setattr(
         "src.core.extractors._click_menu_item", AsyncMock(return_value=True),
     )
-    monkeypatch.setattr("src.core.extractors._dismiss", AsyncMock())
+    dismiss = AsyncMock()
+    monkeypatch.setattr("src.core.extractors._dismiss", dismiss)
     parsed = {
         "country": "Canada" if fields == ("country",) else None,
         "date_joined": "April 2016" if fields == ("date_joined",) else None,
@@ -146,6 +147,7 @@ def test_extractor_ignores_unrequested_panels_and_fields(
     else:
         options.assert_not_awaited()
         poll.assert_not_awaited()
+        dismiss.assert_not_awaited()
 
 
 def test_requested_country_withheld_and_read_failures() -> None:

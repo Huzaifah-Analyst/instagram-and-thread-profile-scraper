@@ -21,50 +21,24 @@ instead of filling the cell with a guess.
 
 ---
 
-## 2. The five checking modes
+## 2. Choose what to check
 
-Pick one on the left before pressing Start.
+**What to Check** is the only checking selector in the desktop app. Select
+any combination of the six Alive, Country and Age boxes for IG and Threads.
+All six start selected. The IG + Threads Alive shortcut controls both Alive
+boxes, so it does not add another request.
 
-### Combined (IG + Threads)
+- IG Alive alone uses the logged-out status checker and needs no login.
+- Threads Alive needs a saved Threads login. Both Alive checks use both
+  platform sessions and stop before their About panels.
+- Country and Age require a login for that platform. Age is joined month/year.
+- Only requested platforms and metadata are checked. Country and Age on the
+  same platform share one About panel.
 
-- Checks **both** platforms for every account.
-- Gives the most data: IG country and joined date, Threads country, joined
-  date and badge.
-- **Slowest.** Measured between about **7 and 10 minutes** for 95 accounts.
-- This is the default.
-
-### Instagram Only
-
-- Checks Instagram only. Threads is not visited.
-- Gives IG status, country and joined date.
-- Measured between about **3.5 and 7 minutes** for 95 accounts.
-
-### Threads Only
-
-- Checks Threads only. Instagram is not visited.
-- Gives Threads status, country, joined date and badge.
-
-### Smart Combined (skip Threads when IG gives country)
-
-- Checks Instagram first. **If Instagram already gave a country, Threads is
-  skipped** for that account. If Instagram gave no country, Threads is checked
-  as a fallback.
-- **Recommended for most runs.** Measured at about **4 minutes** for 95
-  accounts, against 10 minutes for Combined on the same list.
-- **Accuracy is not reduced.** Where both platforms report a country they
-  agreed 36 times out of 36 in testing, and the accounts Threads rescues are
-  exactly the ones Instagram stayed silent on, which this mode still checks.
-- **What you give up:** Threads Joined and Threads Badge for the skipped
-  accounts. If you need those columns, use Combined.
-
-### IG Status Only (no login, fastest)
-
-- Checks **only whether the Instagram account exists**. Active, not found or
-  suspended.
-- **Needs no login at all.** No checker account, no setup step.
-- Measured at about **1 to 1.5 minutes** for 95 accounts.
-- **Cannot return country or joined date.** A logged-out Instagram page shows
-  no profile menu, so the transparency panel does not exist to read.
+Legacy modes remain available through CLI `--mode`, including Smart Combined.
+There are no checking-mode preset radios in the desktop app. Selecting all
+six fields requests both platforms' information; it cannot skip a selected
+Threads field just because Instagram returned a country.
 
 ---
 
@@ -80,23 +54,21 @@ IG status and country. Add **IG Age** to request its joined month/year too.
 Age means the platform's reported joined date, not a calculated exact age.
 At least one checkbox must remain selected before Start.
 
-Clicking a checking-mode preset resets the checkboxes to that preset. Editing
-a checkbox switches to a custom selection and shows its count. **Combined
-remains the startup default.** Preset Smart Combined keeps its conditional
-Threads behavior until you edit individual checks; custom selections visit
-each explicitly selected platform without that conditional omission.
+The visible boxes are the complete request for the next run. Live result
+columns follow that request. Changing boxes after a run prepares the next
+run; existing rows retain their recorded columns until Start or history load.
 
 Only IG Alive by itself uses the anonymous no-login path. Other selections
 use saved login sessions for the selected platforms. Status-only platform
 checks stop after profile identity, without opening About. Country/date
 choices read the shared About panel and keep only requested metadata. A
 country/date check necessarily reads profile status as part of validation.
-Excluded fields are shown as **Not checked**.
+Unselected field columns are hidden in current runs. Older history may show
+**Not checked** in those cells.
 
 - **Input Usernames:** paste usernames, one per line. The count appears top
   right of the box.
 - **Load .txt File:** import a plain text list instead of pasting.
-- **Checking Mode:** the five modes above.
 - **Parallel workers:** how many accounts are checked at the same time, 1 to
   5. Five is the normal setting. This is **not** the number of login accounts;
   one healthy login can drive all five.
@@ -119,26 +91,33 @@ Excluded fields are shown as **Not checked**.
 | --- | --- |
 | **#** | Row number in the order results arrived. |
 | **Username** | The account checked. |
-| **Status** | The overall verdict. See section 5. |
+| **IG Alive** | Actual Instagram status, visible when selected. |
+| **Threads Alive** | Actual Threads status, visible when selected. |
 | **Data** | How complete this row is. See section 6. |
-| **Checker** | Which login account did the work. Empty in IG Status Only. |
+
 | **IG Country** | The country Instagram says the account is based in. |
-| **IG Joined** | The month and year the Instagram account was created. |
+| **IG Age (joined date)** | The month and year the Instagram account was created. |
 | **Threads Country** | The same, from Threads. |
-| **Threads Joined** | Joined month from Threads, plus the follower badge. |
+| **Threads Age (joined date)** | Joined month from Threads, plus the follower badge. |
 | **Duration** | Seconds spent on this account. |
 | **Error** | The reason something is missing, when there is one. |
 
 ---
 
+The header counts each selected Alive platform separately. IG ACTIVE does
+not imply Threads ACTIVE. Double-click a row for stored details, including
+checker and the legacy overall verdict. Older history retains all columns
+when no field selection was recorded. Export column names remain compatible:
+IG Status / Threads Status and IG Joined / Threads Joined.
+
 ## 5. Status values
 
 - **ACTIVE:** the account exists and is reachable.
-- **NOT_FOUND:** the account does not exist, or was deleted or removed.
+- **NOT FOUND:** the account does not exist, or was deleted or removed.
 - **BANNED:** the account is suspended.
-- **ERROR:** the check could not be completed. The account may well be fine.
+- **CHECK FAILED:** the check could not be completed. The account may well be fine.
   Re-run those rows. See section 8.
-- **BLOCKED:** your own login account hit a security check. Stop and resolve
+- **CHECKER BLOCKED:** your own login account hit a security check. Stop and resolve
   the login before continuing.
 - **UNKNOWN:** IG Status Only could not find a clear marker on the page. It
   means "not sure", not "does not exist".
@@ -147,7 +126,7 @@ Excluded fields are shown as **Not checked**.
 
 ## 6. The Data column
 
-- **Complete:** everything the chosen mode asked for was collected.
+- **Complete:** everything the selected checks asked for was collected.
 - **Partial:** some of it was collected. Cell labels explain missing values;
   the Error column contains actual check failures, if any.
 - **Not available:** the account does not exist, so there is nothing to
@@ -279,6 +258,7 @@ Export again after more rows finish or use history for the final batch.
   Setup Checker Account, log in again, clear the challenge, then re-run.
 - **Header says no login saved:** run Setup Checker Account. Not needed for
   IG Status Only.
-- **The whole run is slow:** check the time of day, and prefer Smart Combined.
+- **The whole run is slow:** select only the fields you need. Logged-in
+  checks retain the existing 4-8 second pacing between targets per worker.
 - **Investigating a specific account:** turn on Save debug captures, run only
   that username, and send the resulting `debug` folder files.

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from playwright.async_api import Page
 
 from src.core.check_plan import apply_check_selection, metadata_fields
+from src.core.ban_engine import BanLinkEngine
 from src.core.extractors import extract_instagram, extract_threads
 from src.core.result_records import build_record
 
@@ -58,5 +59,10 @@ async def run_selected(
         username, results["ig"], results["threads"],
         time.monotonic() - started, mode=scraper.mode,
     )
+    # Independent Alive checks must retain each extractor's own observation.
+    for platform, result in results.items():
+        record[f"{platform}_status"] = BanLinkEngine.normalize(
+            result["status"],
+        )
     apply_check_selection(record, checks)
     return record

@@ -426,3 +426,13 @@ No new full-list benchmark or proof of other physical display configurations.
 | P95 | Local suite passed / live acceptance not claimed | 427 passed in 101.57s, zero skips. No fresh live extraction benchmark, country/date audit, login or clean-machine acceptance in this task. Original speed/accuracy gates are not closed by this feature. |
 
 [Shared dated implementation and verification report](implementation/2026-10-17-selectable-checks-and-exports.md).
+
+
+## Checkbox-driven Live Results follow-up (17 October 2026)
+
+| ID | State | Evidence and action |
+| --- | --- | --- |
+| P96 | Fixed / actual Tk and saved-run replay verified | Removed checking-mode preset radios. Every GUI run uses What to Check. Live Results has distinct IG Alive / Threads Alive columns and counts, plus selected country/date columns. Saved 95 rows replayed with 190 status cells, zero mismatches. |
+| P97 | Timing explained / speed improvement unmeasured | User's saved Alive-only run took 300.06s; IG 85 active and Threads 48 active. Sequential platform navigation and existing worker pacing contribute. Removed unnecessary Escape calls from Alive-only extractors; no fresh runtime saving or platform accuracy claim. |
+
+[Changes and dated evidence](implementation/2026-10-17-checks-and-live-columns.md).

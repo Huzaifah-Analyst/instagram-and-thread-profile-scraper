@@ -13,17 +13,20 @@ from tkinter import ttk
 import customtkinter as ctk
 
 from src.gui import theme
+from src.gui.result_scope import platform_status_cell, visible_columns
 
 COLUMNS = (
     ("idx", "#", 40, "center"),
     ("username", "Username", 130, "w"),
-    ("status", "Status", 90, "center"),
+    ("status", "Overall Status", 90, "center"),
     ("quality", "Data", 100, "center"),
     ("checker", "Checker", 100, "w"),
+    ("ig_status", "IG Alive", 110, "center"),
+    ("threads_status", "Threads Alive", 110, "center"),
     ("ig_country", "IG Country", 95, "w"),
-    ("ig_joined", "IG Joined", 105, "w"),
+    ("ig_joined", "IG Age (joined date)", 140, "w"),
     ("threads_country", "Threads Country", 110, "w"),
-    ("threads_joined", "Threads Joined", 125, "w"),
+    ("threads_joined", "Threads Age (joined date)", 165, "w"),
     ("duration", "Duration", 65, "e"),
     ("error", "Error", 160, "w"),
 )
@@ -110,6 +113,8 @@ def record_to_row(position: int, record: dict) -> tuple[str, ...]:
         theme.display_status(record),
         str(record.get("data_quality", "Unknown")),
         str(record.get("checker_id") or ""),
+        platform_status_cell(record, "ig"),
+        platform_status_cell(record, "threads"),
         metadata_cell(record, "ig_country"),
         metadata_cell(record, "ig_date_joined"),
         metadata_cell(record, "threads_country"),
@@ -157,6 +162,15 @@ class DataTable(ctk.CTkFrame):
 
         self._counts: dict[str, int] = {}
         self.records: list[dict] = []
+        self._checks: tuple[str, ...] | None = None
+
+    def set_checks(self, checks: tuple[str, ...] | None) -> None:
+        """Show exactly the recorded checks, or all columns for old history."""
+        self._checks = checks
+        self.tree.configure(displaycolumns=(
+            visible_columns(checks) if checks is not None else "#all"
+        ))
+        self._refresh_summary()
 
     def clear(self) -> None:
         """Removes all rows."""
@@ -168,11 +182,18 @@ class DataTable(ctk.CTkFrame):
     def set_records(self, records: list[dict]) -> None:
         """Replace table rows with a previously saved run."""
         self.clear()
+        self.set_checks(None)
         for record in records:
             self.add_record(record)
 
     def add_record(self, record: dict) -> None:
         """Appends one finished account and scrolls it into view."""
+        recorded = record.get("requested_checks")
+        if not self.records:
+            if recorded is not None:
+                self.set_checks(tuple(recorded))
+        elif recorded is not None and self._checks is not None:
+            self.set_checks(tuple(dict.fromkeys((*self._checks, *recorded))))
         self.records.append(record)
         values = record_to_row(len(self.records), record)
         status = values[2]
@@ -180,7 +201,31 @@ class DataTable(ctk.CTkFrame):
         item = self.tree.insert("", "end", values=values, tags=(tag,))
         self.tree.see(item)
         self._counts[status] = self._counts.get(status, 0) + 1
-        self._summary.configure(text="   ".join(f"{k}: {v}" for k, v in sorted(self._counts.items())))
+        self._refresh_summary()
+
+    def _refresh_summary(self) -> None:
+        """Separate platform totals so IG Active cannot imply Threads Active."""
+        from collections import Counter
+
+        if self._checks is None:
+            parts = [f"{k}: {v}" for k, v in sorted(self._counts.items())]
+        else:
+            parts = []
+            for platform, label in (("ig", "IG"), ("threads", "Threads")):
+                if f"{platform}_alive" not in self._checks:
+                    continue
+                counts = Counter(
+                    platform_status_cell(row, platform) for row in self.records
+                )
+                if counts:
+                    parts.append(f"{label}: " + ", ".join(
+                        f"{count} {status}" for status, count in sorted(
+                            counts.items(),
+                        )
+                    ))
+            if not parts and self.records:
+                parts = [f"{len(self.records)} results"]
+        self._summary.configure(text=" | ".join(parts))
 
     def _show_details(self, event: tk.Event) -> None:
         """Show full errors, per-platform stages, checker and evidence paths."""

@@ -11,6 +11,7 @@ import pytest
 from openpyxl import load_workbook
 
 from src.core.checkers import CheckerStore
+from src.core.check_plan import CHECK_NAMES
 from src.core.history_db import HistoryDB, SCHEMA
 from src.core.output_settings import DEFAULT_NAMES, OutputSettings
 from src.gui.app import MetaInspectorApp
@@ -38,9 +39,8 @@ def reload_output(app: MetaInspectorApp, directory: Path) -> None:
     app.profile_dir = directory / "profile"
     app.checker_store = CheckerStore(app.profile_dir)
     app.table.clear()
-    app.left_panel.mode_var.set("combined")
-    app.left_panel._custom_checks = False
-    app.left_panel.checks_panel.set_preset("combined")
+    app.left_panel.checks_panel.set_selection(CHECK_NAMES)
+    app.table.set_checks(CHECK_NAMES)
     app.output_actions = OutputActions(app, app.table, directory)
     app.status_bar = app.output_actions.bar
     app.status_bar.grid(row=2, column=0, columnspan=2, sticky="ew")
@@ -175,12 +175,13 @@ def test_history_migrates_and_retains_modern_record(tmp_path: Path) -> None:
 
 
 def test_real_history_and_platform_scope(gui_app: MetaInspectorApp, tmp_path: Path) -> None:
-    """All existing radios reach the engine and finished results open in history."""
+    """All field choices reach the engine and finished results open in history."""
     app = gui_app
-    for button in app.left_panel._mode_buttons:
-        button.invoke()
+    for check in CHECK_NAMES:
+        app.left_panel.checks_panel.set_selection((check,))
+        app.left_panel._checks_changed()
         scraper = app._default_factory(app.left_panel.mode, lambda *args: None)
-        assert scraper.mode == button.cget("value")
+        assert scraper.checks == (check,)
     record = {"username": "test", "composite_status": "ACTIVE", "data_quality": "Partial"}
     app._total = 1
     app.table.add_record(record)
@@ -232,8 +233,8 @@ def test_field_cards_forward_scope_and_reject_empty_selection(
         panel.checkboxes["ig_alive"].toggle()
         assert not panel.both_var.get()
     finally:
-        app.left_panel.mode_var.set("combined")
-        app.left_panel._preset_changed()
+        app.left_panel.checks_panel.set_selection(CHECK_NAMES)
+        app.left_panel._checks_changed()
         app.left_panel.textbox.delete("1.0", "end")
 
 
@@ -351,3 +352,58 @@ def test_live_exports_snapshot_completed_rows_without_stopping_run(
         app.bridge = original_bridge
         app.left_panel.textbox.delete("1.0", "end")
         app._apply_state()
+
+
+def test_live_columns_follow_checks_and_retain_recorded_scope(
+    gui_app: MetaInspectorApp,
+) -> None:
+    """Actual Treeview matches Alive boxes and keeps history's own fields."""
+    import customtkinter as ctk
+
+    app = gui_app
+    panel = app.left_panel.checks_panel
+    children = list(app.left_panel.winfo_children())
+    widgets = []
+    while children:
+        widget = children.pop()
+        widgets.append(widget)
+        children.extend(widget.winfo_children())
+    assert not any(isinstance(w, ctk.CTkRadioButton) for w in widgets)
+    assert not any(
+        "Checking Mode" in str(w.cget("text"))
+        for w in widgets if isinstance(w, ctk.CTkLabel)
+    )
+    for name, checkbox in panel.checkboxes.items():
+        if name not in ("ig_alive", "threads_alive"):
+            checkbox.toggle()
+    expected = (
+        "idx", "username", "ig_status", "threads_status",
+        "quality", "duration", "error",
+    )
+    assert tuple(app.table.tree["displaycolumns"]) == expected
+    record = {
+        "username": "fixture", "composite_status": "ACTIVE",
+        "ig_status": "active", "threads_status": "not_found",
+        "requested_checks": ["ig_alive", "threads_alive"],
+        "data_quality": "Complete",
+    }
+    app.table.add_record(record)
+    item = app.table.tree.get_children()[0]
+    assert app.table.tree.set(item, "ig_status") == "ACTIVE"
+    assert app.table.tree.set(item, "threads_status") == "NOT FOUND"
+    assert app.table._summary.cget("text") == (
+        "IG: 1 ACTIVE | Threads: 1 NOT FOUND"
+    )
+    panel.checkboxes["ig_country"].toggle()
+    assert tuple(app.table.tree["displaycolumns"]) == expected
+    app.table.set_records([{
+        "username": "country", "requested_checks": ["ig_country"],
+        "ig_status": "active", "ig_country": "Canada",
+    }])
+    assert tuple(app.table.tree["displaycolumns"]) == (
+        "idx", "username", "ig_country", "quality", "duration", "error",
+    )
+    item = app.table.tree.get_children()[0]
+    assert app.table.tree.set(item, "ig_country") == "Canada"
+    app.table.set_records([{"username": "old", "ig_country": "Turkey"}])
+    assert tuple(app.table.tree["displaycolumns"]) == ("#all",)

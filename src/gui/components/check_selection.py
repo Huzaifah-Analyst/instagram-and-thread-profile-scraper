@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 import customtkinter as ctk
 
-from src.core.check_plan import CHECK_LABELS, CHECK_NAMES, checks_for_mode
+from src.core.check_plan import CHECK_LABELS, CHECK_NAMES
 from src.gui import theme
 
 
@@ -52,7 +52,7 @@ class CheckSelection(ctk.CTkFrame):
             )
             self.checkboxes[name] = control
         self.note = ctk.CTkLabel(
-            self, text="Preset selected. Tick any mix for custom checks.",
+            self, text="6 checks selected. Results show the selected fields.",
             wraplength=260, font=theme.FONT_CAPTION,
         )
         self.note.grid(row=4, column=0, columnspan=2, padx=6, pady=6)
@@ -62,14 +62,18 @@ class CheckSelection(ctk.CTkFrame):
         """Return selected field identifiers in a stable order."""
         return tuple(name for name, var in self.variables.items() if var.get())
 
-    def set_preset(self, mode: str) -> None:
-        """Mirror a legacy preset without emitting a custom-selection event."""
-        checks = checks_for_mode(mode)
+    def set_selection(self, checks: tuple[str, ...]) -> None:
+        """Set visible checks without emitting an event during initialization."""
         for name, variable in self.variables.items():
             variable.set(name in checks)
         self._sync_both()
+        self._update_note()
+
+    def _update_note(self) -> None:
+        """Explain how the visible selection controls the result columns."""
         self.note.configure(
-            text="Preset selected. Tick any mix for custom checks.",
+            text=f"{len(self.selection)} checks selected. "
+                 "Results show the selected fields.",
         )
 
     def set_enabled(self, enabled: bool) -> None:
@@ -91,10 +95,7 @@ class CheckSelection(ctk.CTkFrame):
         self._changed()
 
     def _changed(self) -> None:
-        """Explain custom scope and notify the owning panel."""
+        """Update the selection and notify the owning panel."""
         self._sync_both()
-        count = len(self.selection)
-        self.note.configure(
-            text=f"Custom: {count} checks. Select Output sets export fields.",
-        )
+        self._update_note()
         self.on_changed()

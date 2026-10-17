@@ -215,8 +215,10 @@ def test_record_to_row() -> None:
     record = {"username": "elif", "composite_status": "ACTIVE", "ig_status": "active", "ig_country": "Turkey",
               "ig_date_joined": "Sep 2026", "threads_date_joined": "Sep 2026", "threads_badge": "100M+",
               "seconds": 2.44}
-    assert record_to_row(1, record) == ("01", "@elif", "ACTIVE", "Unknown", "", "Turkey", "Sep 2026", "N/A",
-                                        "Sep 2026 · 100M+", "2.4s", "")
+    assert record_to_row(1, record) == (
+        "01", "@elif", "ACTIVE", "Unknown", "", "ACTIVE", "UNKNOWN",
+        "Turkey", "Sep 2026", "N/A", "Sep 2026 \u00b7 100M+", "2.4s", "",
+    )
 
 
 def test_record_to_row_surfaces_error_message() -> None:

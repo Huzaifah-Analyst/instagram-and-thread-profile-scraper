@@ -1,6 +1,8 @@
 # MetaInspector Desktop Quick Start
 
 Windows 10/11, 64-bit. Use the supplied `MetaInspectorDesktop.exe`.
+The 17 October follow-up build is `dist/updated/MetaInspectorDesktop.exe`;
+close the older app before checking with this build.
 No Python or Playwright installation is required by this bundled build.
 Local verification and its limits are recorded in
 [the packaged-build report](implementation/bl01-packaged-verification.md).
@@ -22,7 +24,7 @@ Local verification and its limits are recorded in
 
 ## 2. Checker setup
 
-Skip this section for **IG Status Only (no login, fastest)**.
+Skip this section when **only IG Alive** is selected.
 
 1. With one checker selected, **Setup Checker Account** opens its setup browser
    directly. To choose accounts first, click **Manage checkers**.
@@ -44,40 +46,34 @@ The app generates TOTP codes locally. Email/SMS verification, CAPTCHA,
 suspension and unresolved onboarding require manual action. Keep the input
 file private and do not include it with a client delivery.
 
-## 3. Input and modes
+## 3. Input and checks
 
 Paste one target username per line, with or without `@`, or use **Load .txt
-File**. The count beside Input Usernames updates. Keep **Parallel workers**
-at its default unless testing a specific setting. Scroll the left panel to
-reach input, modes or run controls on smaller displays. This controls pages, not
-how many checker accounts are selected.
+File**. In **What to Check**, tick only the fields you need:
 
-| Mode | Returns | Does not collect |
-| --- | --- | --- |
-| Combined (IG + Threads) | IG and Threads status, country and joined date; Threads badge when available | Nothing intentionally omitted from those fields; a platform can withhold information |
-| Instagram Only | IG status, country and joined date | All Threads information |
-| Threads Only | Threads status, country, joined date and badge | All IG information |
-| Smart Combined (skip Threads when IG gives country) | IG results first; Threads results only if IG provides no real country | Threads status, country, joined date and badge for skipped targets |
-| IG Status Only (no login, fastest) | Logged-out IG active, suspended or not-found status when an explicit marker appears; otherwise Unknown | Country, joined date, and all Threads information |
+| Checkbox | Live Results column |
+| --- | --- |
+| IG Alive | IG Alive, Instagram's own status |
+| Threads Alive | Threads Alive, Threads' own status |
+| IG Country | IG Country |
+| Threads Country | Threads Country |
+| IG Age (joined date) | IG Age (joined date) |
+| Threads Age (joined date) | Threads Age (joined date) |
 
-**Combined remains the default.** Smart Combined shows **Skipped (IG country)**
-for deliberate omissions and does not copy IG values into Threads fields.
-A complete requested result can be Complete even when Threads was skipped.
+**IG + Threads Alive** toggles both status boxes. All six fields start
+selected. At least one must be selected. The desktop has no mode presets;
+legacy CLI modes remain available. Parallel workers remains at five by
+default. Scroll the left panel to reach input or controls on smaller screens.
 
-IG Status Only cannot return country or join date: a logged-out Instagram
-profile page exposes no About control at all. Its cells show **Unavailable
-(status only)**. It uses no checker login and no logged-in-account pacing.
-Unknown is an inconclusive read, not proof that an account is missing.
+Only IG Alive by itself needs no login. Other selections use saved sessions
+for the requested platforms. Alive checks stop at profile identity and skip
+About panels. Country and Age share a panel, retaining only requested fields.
 
-**Choose individual checks:** in **What to Check**, tick any combination of
-IG/Threads Alive, Country and Age (joined date). IG + Threads Alive toggles
-both status checks together. Age returns the reported joined month/year.
-A checkbox edit uses custom field scope; selecting a mode preset restores
-that preset's scope. At least one check is required. Only IG Alive by itself
-uses anonymous checking; other selections use the required platform logins.
-Unselected metadata is Not checked, and status-only checks avoid About panels.
+The table shows selected fields first, followed by Data, Duration and Error.
+Each Alive column and its header totals use that platform's own result.
+Unknown or failed reads stay explicit. After completion, changing checks
+prepares the next run; existing records retain their recorded columns.
 
-![What to Check in the rebuilt app, 17 October 2026](implementation/images/selectable-checks-exe-2026-10-17.png)
 Each anonymous attempt allows at least 30 seconds for a decision marker.
 Unknown targets receive one automatic retry after the main pass with the
 same warm context. If still Unknown, the Error field keeps the read reason.
@@ -91,7 +87,8 @@ Independent Round 11 measurements on a **95-account list** were Combined
 These are individual measured runs, not promised timings. See the
 [review](implementation/round11-targeted-modes-review.md). Site rendering and
 network conditions change runtime. Smart Combined omits Threads Joined and
-Threads Badge for skipped targets; choose Combined when you need those too.
+Threads Badge for skipped targets. These historical CLI/preset timings are
+not a timing claim for the current checkbox selections.
 
 ## 4. Run and inspect
 
@@ -155,7 +152,7 @@ platforms do not. The same filter applies to copy, CSV and Excel.
 - History supports its own Alive row filter and the current column selection.
 
 The 17 October 2026 implementation and verification report shared with coding
-reviewers is [selectable checks and exports](implementation/2026-10-17-selectable-checks-and-exports.md).
+reviewers is [checks and matching live columns](implementation/2026-10-17-checks-and-live-columns.md).
 
 ## 7. Troubleshooting
 
@@ -165,7 +162,7 @@ reviewers is [selectable checks and exports](implementation/2026-10-17-selectabl
 | Browser profile already in use | Close that checker's setup browser before running a check |
 | Setup remains on onboarding | Maximize the browser, complete all pages and confirm the feed before closing |
 | Unknown status or read error | Check connectivity and the target in a browser; retry later without guessing the status |
-| Country/date intentionally unavailable | Check the selected mode and field explanation; use a logged-in mode when needed |
+| Country/date intentionally unavailable | Check the selected fields and cell explanation |
 | CSV/Excel save error | Choose a writable folder and close any application locking that file |
 
 A separate physical Windows machine without Python/Playwright still needs

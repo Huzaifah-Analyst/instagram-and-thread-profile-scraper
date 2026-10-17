@@ -12,7 +12,7 @@ from typing import Callable, Optional
 import customtkinter as ctk
 
 from src.core.scraper import MODE_COMBINED, MODE_IG_ONLY, MultiWorkerScraper, login_session
-from src.core.modes import MODE_IG_STATUS_ONLY, MODE_COMBINED_SMART, STATUS_ONLY_NOTICE
+from src.core.modes import MODE_IG_STATUS_ONLY, STATUS_ONLY_NOTICE
 from src.core.session import SESSION_CONNECTED, check_session
 from src.core.checkers import Checker, CheckerStore
 from src.core.credentials import AccountCredential
@@ -71,6 +71,7 @@ class MetaInspectorApp(ctk.CTk):
         self.left_panel.grid(row=1, column=0, sticky="nsw")
         self.table = DataTable(self)
         self.table.grid(row=1, column=1, sticky="nsew", padx=14, pady=14)
+        self.table.set_checks(self.left_panel.requested_checks)
         self.output_actions = OutputActions(self, self.table, self.checker_store.path.parent)
         self.status_bar = self.output_actions.bar
         self.status_bar.grid(row=2, column=0, columnspan=2, sticky="ew")
@@ -124,10 +125,10 @@ class MetaInspectorApp(ctk.CTk):
         """Explain intentional scope limitations before a run starts."""
         if self.left_panel.mode == MODE_IG_STATUS_ONLY:
             self.status_bar.message(STATUS_ONLY_NOTICE)
-        elif self.left_panel.mode == MODE_COMBINED_SMART:
-            self.status_bar.message("Threads is skipped when Instagram supplies a country.")
         else:
             self.status_bar.message("Ready. Paste usernames and press Start.")
+        if not self.table.records:
+            self.table.set_checks(self.left_panel.requested_checks)
         self._refresh_session()
         self._apply_state()
 
@@ -144,6 +145,7 @@ class MetaInspectorApp(ctk.CTk):
             self.status_bar.message("Paste at least one username first.", "warn")
             return
         self.table.clear()
+        self.table.set_checks(self.left_panel.requested_checks)
         self.status_bar.set_results_available(False)
         self._total, self._done = len(usernames), 0
         self.status_bar.set_progress(0, self._total)

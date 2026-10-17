@@ -215,3 +215,15 @@
   all production/test modules found zero differences from the tested version.
 - No live platform benchmark or accuracy claim. Shared report and evidence:
   implementation/2026-10-17-selectable-checks-and-exports.md.
+
+
+## 17 October 2026: checkboxes and matching result columns
+
+- Initial sandbox focused run: 119 passed, 26 temporary-directory permission
+  setup errors. Local output: debug/result-scope-targeted.txt.
+- Focused retry with normal test access: 145 passed in 19.48s.
+- Final full suite: 449 passed in 84.77s, zero skips.
+- Actual source-app replay: 95 saved targets, 190 platform status cells,
+  zero mismatches. No fresh network check. An initial screenshot helper blocked
+  its own Tk loop; keeping the loop responsive fixed the local capture.
+- [Report, build location and limits](implementation/2026-10-17-checks-and-live-columns.md).
