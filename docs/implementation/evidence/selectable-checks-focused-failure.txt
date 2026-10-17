@@ -1,0 +1,31 @@
+........................................................................ [ 72%]
+.....................F......                                             [100%]
+================================== FAILURES ===================================
+__________ test_field_cards_forward_scope_and_reject_empty_selection __________
+
+gui_app = <src.gui.app.MetaInspectorApp object .>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001A75EC99340>
+
+    def test_field_cards_forward_scope_and_reject_empty_selection(
+        gui_app: MetaInspectorApp, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Actual checkbox edits control the production factory and run validation."""
+        from src.gui.bridge import RunState
+
+        app = gui_app
+        panel = app.left_panel.checks_panel
+        try:
+            for name, checkbox in panel.checkboxes.items():
+                if name not in ("ig_alive", "ig_country"):
+                    checkbox.toggle()
+>           assert app.left_panel.requested_checks == ("ig_alive", "ig_country")
+E           AssertionError: assert ('ig_alive', ...'threads_age') == ('ig_alive', 'ig_country')
+E
+E             At index 1 diff: 'threads_alive' != 'ig_country'
+E             Left contains 3 more items, first extra item: 'threads_country'
+E             Use -v to get more diff
+
+tests\test_output_selection.py:204: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_output_selection.py::test_field_cards_forward_scope_and_reject_empty_selection
+1 failed, 99 passed in 17.02s

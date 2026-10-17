@@ -113,6 +113,7 @@ class MetaInspectorApp(ctk.CTk):
             checkers=([] if mode == MODE_IG_STATUS_ONLY else
                       [slot for slot in self.checker_store.load() if slot.enabled]),
             persist_results=True,
+            checks=self.left_panel.requested_checks,
         )
 
     # ------------------------------------------------------------------ #
@@ -135,6 +136,7 @@ class MetaInspectorApp(ctk.CTk):
         try:
             usernames = self.left_panel.usernames()
             self.left_panel.validate_timeouts()
+            self.left_panel.validate_checks()
         except ValueError as exc:
             self.status_bar.message(str(exc), "error")
             return

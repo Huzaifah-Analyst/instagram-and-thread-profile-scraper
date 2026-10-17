@@ -1,0 +1,68 @@
+{
+  "date": "2026-10-17",
+  "branch": "feature/selectable-checks-and-exports",
+  "base_commit": "85dd8ec",
+  "suite": {
+    "passed": 427,
+    "skipped": 0,
+    "seconds": 101.57
+  },
+  "new_cases": 88,
+  "valid_checkbox_combinations": 63,
+  "real_tk_verified": [
+    "field scope forwarded to factory",
+    "empty scope preserves prior results",
+    "checkboxes disabled during run",
+    "both-Alive shortcut",
+    "full/country/age/checked-field presets",
+    "draft cancellation",
+    "Alive filtered clipboard/history",
+    "no empty export file",
+    "copy CSV and XLSX while bridge RUNNING"
+  ],
+  "real_chromium_verified": [
+    "joined-date-only panel request returns without waiting for unselected country"
+  ],
+  "audit": {
+    "production_files": 47,
+    "largest_production_file_lines": 460,
+    "supplied_credential_match_paths": [],
+    "new_module_annotation_docstring_violations": [],
+    "new_module_line_length_violations": 0,
+    "semantic_ast_changes_after_formatting": []
+  },
+  "new_live_platform_benchmark": false,
+  "clean_machine_verified": false,
+  "unverified": [
+    "live Meta per-field extraction accuracy",
+    "full-list runtime",
+    "under-five-minute acceptance",
+    "second bare Windows machine",
+    "packaged checkbox/export interactions beyond visual rendering"
+  ],
+  "artifact": {
+    "path": "dist\\MetaInspectorDesktop.exe",
+    "bytes": 325063629,
+    "sha256": "2f2a0319aaa844061466bdc6c8d874061e25565233e7c4b15e54ad85d5c703c2",
+    "build_succeeded": true
+  },
+  "packaged_visual_check": {
+    "launched": true,
+    "responsive": true,
+    "isolated_data_root": true,
+    "window_capture_size": [
+      1900,
+      1040
+    ],
+    "visible": [
+      "six field cards",
+      "both-Alive shortcut",
+      "copy/export row filter",
+      "live snapshot caption"
+    ],
+    "closed_owned_window": true,
+    "native_checkbox_message_visibly_changed_state": false,
+    "live_extraction_run": false,
+    "packaged_export_clicks_verified": false
+  }
+}

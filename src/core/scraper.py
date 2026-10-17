@@ -50,6 +50,9 @@ from src.core.modes import (
     MODE_IG_STATUS_ONLY, MODES,
 )
 from src.core.result_records import build_record
+from src.core.check_plan import (
+    apply_check_selection, mode_for_checks, normalize_checks,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +111,7 @@ class MultiWorkerScraper:
         checkers: Optional[list[Checker]] = None,
         persist_results: bool = False,
         resource_blocker_enabled: bool = True,
+        checks: tuple[str, ...] | None = None,
     ) -> None:
         """Configures the scraper.
 
@@ -138,6 +142,9 @@ class MultiWorkerScraper:
         """
         if mode not in MODES:
             raise ValueError(f"mode must be one of {MODES}")
+        self.checks = normalize_checks(checks) if checks is not None else None
+        if self.checks is not None:
+            mode = mode_for_checks(self.checks)
         if min_delay < 0 or max_delay < 0 or min_delay > max_delay:
             raise ValueError("Delays must be nonnegative and min_delay <= max_delay")
         if not 1 <= workers <= 5:
@@ -293,6 +300,10 @@ class MultiWorkerScraper:
             return await check_status(
                 page, username, anonymous_timeout_s(self.page_ready_timeout_s),
             )
+        if self.checks is not None:
+            from src.core.selected_checks import run_selected
+
+            return await run_selected(self, page, username)
         t0 = time.monotonic()
         ig = empty_platform_result()
         threads = empty_platform_result()
@@ -330,6 +341,8 @@ class MultiWorkerScraper:
 
     def _emit(self, record: dict) -> None:
         """Sends a record to the progress callback without letting it crash a worker."""
+        if self.checks is not None:
+            apply_check_selection(record, self.checks)
         self._save_event(record)
         if self.progress_callback is None:
             return
@@ -366,6 +379,9 @@ def main() -> None:
     parser.add_argument("usernames", nargs="*", help="Usernames to check")
     parser.add_argument("--file", type=Path, help="Text file with one username per line")
     parser.add_argument("--mode", choices=MODES, default=MODE_COMBINED)
+    parser.add_argument(
+        "--checks", help="Comma-separated checks, e.g. ig_alive,ig_country",
+    )
     parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS)
     parser.add_argument("--profile", type=Path, default=DEFAULT_PROFILE_DIR)
     parser.add_argument("--checkers", help="Comma-separated checker numbers, e.g. 1,2,3,4,5")
@@ -387,6 +403,13 @@ def main() -> None:
                         help="Write every dialog/panel text seen to debug/ (git-ignored), to "
                              "check whether a parsed value is genuine vs. stale/decoy data")
     args = parser.parse_args()
+    checks = None
+    if args.checks is not None:
+        try:
+            checks = normalize_checks(args.checks.split(","))
+            args.mode = mode_for_checks(checks)
+        except ValueError as exc:
+            parser.error(str(exc))
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     # Windows consoles default to cp1252, which cannot print Turkish country names.
@@ -418,7 +441,10 @@ def main() -> None:
                                  headless=not args.headed, page_ready_timeout_s=args.page_ready_timeout,
                                  dialog_timeout_s=args.dialog_timeout, menu_click_timeout_s=args.menu_click_timeout,
                                  debug_dump=args.debug_dump,
-                                 resource_blocker_enabled=args.resource_blocker_enabled)
+                                 resource_blocker_enabled=(
+                                     args.resource_blocker_enabled
+                                 ),
+                                 checks=checks)
     t0 = time.monotonic()
     records = scraper.run(names)
     elapsed = time.monotonic() - t0

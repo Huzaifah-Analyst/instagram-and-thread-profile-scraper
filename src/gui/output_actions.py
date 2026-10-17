@@ -8,6 +8,8 @@ import customtkinter as ctk
 
 from src.core.history_db import HistoryDB
 from src.core.output_settings import OutputSettings, selected_columns
+from src.core.check_plan import checks_for_mode
+from src.core.export_selection import filter_records
 from src.gui.actions import copy_to_clipboard, export_records
 from src.gui.components.data_table import DataTable
 from src.gui.components.history_dialog import HistoryDialog
@@ -35,20 +37,45 @@ class OutputActions:
 
     def copy(self) -> None:
         """Copy selected result columns and retain sprint3's success feedback."""
-        if copy_to_clipboard(self.master, self.table.records, selected_columns(self.names)):
+        if copy_to_clipboard(
+            self.master, self._export_rows(), selected_columns(self.names),
+        ):
             self.bar.flash_copied()
 
     def export(self, kind: str) -> None:
         """Save exactly the selected columns, including any selected diagnostics."""
-        export_records(self.master, self.table.records, kind,
+        export_records(self.master, self._export_rows(), kind,
                        columns=selected_columns(self.names))
+
+    def _export_rows(self) -> list[dict]:
+        """Take an independent snapshot, including during a run."""
+        rows = filter_records(
+            self.table.records, self.bar.row_filter_var.get(),
+        )
+        if not rows:
+            self.bar.message(
+                "No completed rows match this export filter.", "warn",
+            )
+        return rows
 
     def select_output(self) -> None:
         """Open one modal draft selector at a time."""
         if self.dialog is not None and self.dialog.winfo_exists():
             self.dialog.lift()
             return
-        self.dialog = OutputDialog(self.master, self.names, self.apply_selection)
+        checks = None
+        if self.table.records:
+            record = self.table.records[0]
+            checks = tuple(record.get("requested_checks") or checks_for_mode(
+                record.get("checking_mode", "combined"),
+            ))
+        else:
+            panel = getattr(self.master, "left_panel", None)
+            if panel is not None:
+                checks = panel.requested_checks or checks_for_mode(panel.mode)
+        self.dialog = OutputDialog(
+            self.master, self.names, self.apply_selection, checks=checks,
+        )
 
     def apply_selection(self, names: tuple[str, ...]) -> bool:
         """Save before applying, keeping the previous selection on I/O failure."""

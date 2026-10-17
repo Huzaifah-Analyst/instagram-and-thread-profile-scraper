@@ -64,6 +64,12 @@ def metadata_cell(record: dict, field: str) -> str:
     platform = "ig" if field.startswith("ig_") else "threads"
     mode = record.get("checking_mode")
     status = record.get(f"{platform}_status")
+    checks = record.get("requested_checks")
+    check = f"{platform}_country" if field.endswith("_country") else (
+        f"{platform}_age"
+    )
+    if checks is not None and check not in checks:
+        return "Not checked"
     if mode == "ig_status_only":
         return (
             "Unavailable (status only)" if platform == "ig" else "Not checked"

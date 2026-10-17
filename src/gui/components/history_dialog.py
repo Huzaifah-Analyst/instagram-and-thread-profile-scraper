@@ -16,6 +16,7 @@ import customtkinter as ctk
 
 from src.core.history_db import HistoryDB
 from src.core.output_settings import DEFAULT_NAMES, selected_columns
+from src.core.export_selection import ROW_FILTERS, filter_records
 from src.gui import theme
 from src.gui.actions import copy_to_clipboard, export_records
 from src.gui.components.data_table import TREE_STYLE, DataTable
@@ -96,6 +97,12 @@ class HistoryDialog(ctk.CTkToplevel):
             ctk.CTkButton(actions, text=label, width=110, command=lambda k=kind: self._export(k),
                           fg_color=theme.BG_ELEVATED, hover_color=theme.BORDER_COLOR,
                           font=theme.FONT_BODY).pack(side="left", padx=(8, 0))
+        self.row_filter_var = ctk.StringVar(value=ROW_FILTERS[0])
+        self.row_filter_menu = ctk.CTkOptionMenu(
+            self, values=list(ROW_FILTERS), variable=self.row_filter_var,
+            width=200,
+        )
+        self.row_filter_menu.grid(row=4, column=0, sticky="w", padx=16, pady=6)
         self._status = ctk.CTkLabel(actions, text="", font=theme.FONT_CAPTION, text_color=theme.TEXT_MUTED)
         self._status.pack(side="right")
 
@@ -144,12 +151,18 @@ class HistoryDialog(ctk.CTkToplevel):
 
     def _copy(self) -> None:
         """Copies the selected run to the clipboard."""
-        if copy_to_clipboard(self, self.records, selected_columns(self.selection())):
+        rows = filter_records(self.records, self.row_filter_var.get())
+        if not rows:
+            self._status.configure(text="No rows match this export filter.")
+        if copy_to_clipboard(self, rows, selected_columns(self.selection())):
             self.copy_button.configure(text="✓  Copied!")
             self.after(2000, lambda: self.copy_button.winfo_exists()
                        and self.copy_button.configure(text="📋  Copy for Google Sheets"))
 
     def _export(self, kind: str) -> None:
         """Exports the selected run, named after its run id."""
-        export_records(self, self.records, kind, default_name=self.selected_run_id,
+        rows = filter_records(self.records, self.row_filter_var.get())
+        if not rows:
+            self._status.configure(text="No rows match this export filter.")
+        export_records(self, rows, kind, default_name=self.selected_run_id,
                        columns=selected_columns(self.selection()))

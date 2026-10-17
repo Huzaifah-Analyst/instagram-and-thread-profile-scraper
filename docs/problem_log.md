@@ -414,3 +414,15 @@ No new full-list benchmark or proof of other physical display configurations.
 - Final suite: 339 passed in 78.08s, zero skips. Rebuilt local EXE; no runtime
   retest of this artifact or clean-machine acceptance.
 - [Implementation, actual before/after evidence and limits](implementation/status-clarity-and-cold-start.md).
+
+
+## Selectable checks and exports (17 October 2026)
+
+| ID | State | Evidence and action |
+| --- | --- | --- |
+| P92 | Implemented / combination and GUI tests pass | What to Check exposes six independent IG/Threads Alive, Country and Age choices plus a both-Alive shortcut. All 63 nonempty combinations have a session plan. Empty scope rejected. Existing modes remain presets and Combined stays default. |
+| P93 | Implemented / extraction-scope tests pass | Custom checks skip excluded platforms, stop at identity for Alive-only, poll only requested metadata, retain requested-check scope in records and grade it accordingly. Unrequested values remain None and display Not checked. Legacy preset grading remains covered by the full suite. |
+| P94 | Implemented / actual Tk and file tests pass | Full/status/country/age/checked-field export presets, platform-specific Alive filters, same copy/CSV/XLSX selection and filters in history. Export during a held-open fixture run saves completed rows without stopping the batch; later arrivals require a new snapshot. |
+| P95 | Local suite passed / live acceptance not claimed | 427 passed in 101.57s, zero skips. No fresh live extraction benchmark, country/date audit, login or clean-machine acceptance in this task. Original speed/accuracy gates are not closed by this feature. |
+
+[Shared dated implementation and verification report](implementation/2026-10-17-selectable-checks-and-exports.md).

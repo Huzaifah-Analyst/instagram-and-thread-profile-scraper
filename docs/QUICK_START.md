@@ -68,6 +68,16 @@ IG Status Only cannot return country or join date: a logged-out Instagram
 profile page exposes no About control at all. Its cells show **Unavailable
 (status only)**. It uses no checker login and no logged-in-account pacing.
 Unknown is an inconclusive read, not proof that an account is missing.
+
+**Choose individual checks:** in **What to Check**, tick any combination of
+IG/Threads Alive, Country and Age (joined date). IG + Threads Alive toggles
+both status checks together. Age returns the reported joined month/year.
+A checkbox edit uses custom field scope; selecting a mode preset restores
+that preset's scope. At least one check is required. Only IG Alive by itself
+uses anonymous checking; other selections use the required platform logins.
+Unselected metadata is Not checked, and status-only checks avoid About panels.
+
+![What to Check in the rebuilt app, 17 October 2026](implementation/images/selectable-checks-exe-2026-10-17.png)
 Each anonymous attempt allows at least 30 seconds for a decision marker.
 Unknown targets receive one automatic retry after the main pass with the
 same warm context. If still Unknown, the Error field keeps the read reason.
@@ -106,6 +116,9 @@ Threads Badge for skipped targets; choose Combined when you need those too.
 ## 5. Choose and copy output
 
 1. Click **Select Output**, tick the columns you need, then **OK**.
+   Quick presets offer **Full export**, **Alive/status only**, **Country only**,
+   **Age/joined only**, and **Checked fields**. Full export means all available
+   columns of collected data; it does not launch additional checks.
    If the popup extends below the screen, drag its title bar upward to expose
    OK and Cancel. Username is mandatory. If every optional column is off, Status is retained.
    Data Quality and Country Availability diagnostics are optional too.
@@ -115,6 +128,10 @@ Threads Badge for skipped targets; choose Combined when you need those too.
    says **Copied!** and a green message reports the copied count.
 4. In Google Sheets, select the top-left empty cell and press **Ctrl+V**.
    The selected tab-separated columns paste into separate cells.
+
+Use **Copy/export rows** for All results, IG Alive only, Threads Alive only,
+or Both Alive only. Active/private counts as Alive; Unknown and skipped
+platforms do not. The same filter applies to copy, CSV and Excel.
 
 ![Select Output in the rebuilt executable](implementation/images/packaged-output-selection.png)
 
@@ -132,6 +149,13 @@ Threads Badge for skipped targets; choose Combined when you need those too.
   writable app-data folder; a storage failure is reported visibly.
 - Old saved runs retain their original recorded quality/errors. Updating the
   executable does not rewrite earlier results.
+- Live export works during a run as soon as a finished row exists. It copies
+  or saves finished rows so far, with current field/row choices, while checking
+  continues. This is a snapshot, not a file that automatically appends new rows.
+- History supports its own Alive row filter and the current column selection.
+
+The 17 October 2026 implementation and verification report shared with coding
+reviewers is [selectable checks and exports](implementation/2026-10-17-selectable-checks-and-exports.md).
 
 ## 7. Troubleshooting
 

@@ -4,7 +4,7 @@ import csv
 import sqlite3
 import subprocess
 import sys
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -39,6 +39,8 @@ def reload_output(app: MetaInspectorApp, directory: Path) -> None:
     app.checker_store = CheckerStore(app.profile_dir)
     app.table.clear()
     app.left_panel.mode_var.set("combined")
+    app.left_panel._custom_checks = False
+    app.left_panel.checks_panel.set_preset("combined")
     app.output_actions = OutputActions(app, app.table, directory)
     app.status_bar = app.output_actions.bar
     app.status_bar.grid(row=2, column=0, columnspan=2, sticky="ew")
@@ -187,3 +189,165 @@ def test_real_history_and_platform_scope(gui_app: MetaInspectorApp, tmp_path: Pa
     viewer = app.output_actions.history_dialog
     assert viewer.records == [record]
     assert viewer.details.records == [record]
+
+
+def test_field_cards_forward_scope_and_reject_empty_selection(
+    gui_app: MetaInspectorApp, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Actual checkbox edits control the factory and run validation."""
+    from src.gui.bridge import RunState
+
+    app = gui_app
+    panel = app.left_panel.checks_panel
+    try:
+        for name, checkbox in panel.checkboxes.items():
+            if name not in ("ig_alive", "ig_country"):
+                checkbox.toggle()
+        assert app.left_panel.requested_checks == ("ig_alive", "ig_country")
+        engine = app._default_factory(app.left_panel.mode, lambda *_: None)
+        assert engine.mode == "ig_only"
+        assert engine.checks == ("ig_alive", "ig_country")
+        app.left_panel.apply_state(RunState.RUNNING)
+        assert all(
+            checkbox.cget("state") == "disabled"
+            for checkbox in panel.checkboxes.values()
+        )
+        app.left_panel.apply_state(RunState.IDLE)
+        for checkbox in panel.checkboxes.values():
+            checkbox.deselect()
+        panel._changed()
+        previous = {"username": "previous", "composite_status": "ACTIVE"}
+        app.table.set_records([previous])
+        app.left_panel.textbox.insert("1.0", "target")
+        started = []
+        monkeypatch.setattr(
+            app.bridge, "start", lambda *args: started.append(args),
+        )
+        app._on_start()
+        assert not started
+        assert app.table.records == [previous]
+        assert "Select at least one" in app.status_bar._message.cget("text")
+        panel.both_button.toggle()
+        assert set(panel.selection) == {"ig_alive", "threads_alive"}
+        panel.checkboxes["ig_alive"].toggle()
+        assert not panel.both_var.get()
+    finally:
+        app.left_panel.mode_var.set("combined")
+        app.left_panel._preset_changed()
+        app.left_panel.textbox.delete("1.0", "end")
+
+
+def test_export_presets_draft_cancel_and_filtered_history(
+    gui_app: MetaInspectorApp, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Actual widgets apply field presets and Alive filters."""
+    app = gui_app
+    records = [
+        {"username": "alive", "ig_status": "active",
+         "threads_status": "not_found", "ig_country": "Canada",
+         "requested_checks": ["ig_alive", "ig_country"]},
+        {"username": "unknown", "ig_status": "unknown"},
+    ]
+    app.table.set_records(records)
+    app.status_bar.set_results_available(True)
+    app.output_actions.select_output()
+    dialog = app.output_actions.dialog
+    assert dialog is not None
+    dialog.apply_preset("Checked fields")
+    chosen = {name for name, var in dialog.variables.items() if var.get()}
+    assert chosen == {"Username", "IG Status", "IG Country"}
+    dialog.apply_preset("Full export")
+    assert all(var.get() for var in dialog.variables.values())
+    dialog.apply_preset("Country only")
+    dialog.ok_button.invoke()
+    assert app.output_actions.names == (
+        "Username", "IG Country", "Threads Country",
+    )
+    app.status_bar.row_filter_var.set("IG Alive only")
+    app.status_bar.copy_button.invoke()
+    assert app.clipboard_get().splitlines() == [
+        "Username\tIG Country\tThreads Country", "alive\tCanada\tN/A",
+    ]
+    saved = app.output_actions.names
+    app.output_actions.select_output()
+    app.output_actions.dialog.apply_preset("Age/joined only")
+    app.output_actions.dialog.destroy()
+    assert app.output_actions.names == saved
+    app.output_actions.save_run(records, "ig_only", 2, 1)
+    app.output_actions.show_history()
+    viewer = app.output_actions.history_dialog
+    assert viewer is not None
+    viewer.row_filter_var.set("IG Alive only")
+    viewer.copy_button.invoke()
+    assert len(app.clipboard_get().splitlines()) == 2
+    app.status_bar.row_filter_var.set("Both Alive only")
+    destination = tmp_path / "should-not-exist.csv"
+    monkeypatch.setattr(
+        "src.gui.actions.filedialog.asksaveasfilename",
+        lambda **_: str(destination),
+    )
+    app.status_bar.csv_button.invoke()
+    assert not destination.exists()
+    assert "No completed rows match" in app.status_bar._message.cget("text")
+    assert app.table.records == records
+
+
+def test_live_exports_snapshot_completed_rows_without_stopping_run(
+    gui_app: MetaInspectorApp, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Actual bridge progress permits export before the batch finishes."""
+    import threading
+    import time
+
+    from src.gui.bridge import RunState, ScraperBridge
+    from test_gui_bridge import FakeScraper
+
+    app = gui_app
+    original_bridge = app.bridge
+    gate = threading.Event()
+    gate.set()
+
+    def factory(
+        mode: str, callback: Callable[[int, int, dict], None],
+    ) -> FakeScraper:
+        """Hold the second result while export reads the first final row."""
+        def progress(done: int, total: int, record: dict) -> None:
+            """Publish one result, then block later work until released."""
+            callback(done, total, record)
+            gate.clear()
+        return FakeScraper(mode, progress, gate=gate)
+
+    app.bridge = ScraperBridge(factory)
+    try:
+        app.left_panel.textbox.insert("1.0", "first\nsecond")
+        app._on_start()
+        deadline = time.monotonic() + 4
+        while not app.table.records and time.monotonic() < deadline:
+            app.update()
+            time.sleep(.01)
+        assert app.bridge.state is RunState.RUNNING
+        assert len(app.table.records) == 1
+        app.status_bar.copy_button.invoke()
+        assert len(app.clipboard_get().splitlines()) == 2
+        path = tmp_path / "live.csv"
+        monkeypatch.setattr(
+            "src.gui.actions.filedialog.asksaveasfilename",
+            lambda **_: str(path),
+        )
+        app.status_bar.csv_button.invoke()
+        with path.open(encoding="utf-8-sig", newline="") as handle:
+            assert len(list(csv.reader(handle))) == 2
+        path = tmp_path / "live.xlsx"
+        app.status_bar.xlsx_button.invoke()
+        assert load_workbook(path).active.max_row == 2
+        assert app.bridge.state is RunState.RUNNING
+        assert len(app.table.records) == 1
+    finally:
+        gate.set()
+        app.bridge.join(3)
+        app.bridge.poll()
+        app.bridge = original_bridge
+        app.left_panel.textbox.delete("1.0", "end")
+        app._apply_state()

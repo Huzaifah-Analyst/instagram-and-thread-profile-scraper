@@ -20,6 +20,7 @@ async def _poll_dialog(
     dialog_timeout_s: float = DIALOG_TIMEOUT_S,
     debug_sink: Optional[Callable[[str], None]] = None,
     expected_username: Optional[str] = None,
+    required_fields: tuple[str, ...] | None = None,
 ) -> dict:
     """Read only visible matching dialogs; allow remaining fields to arrive.
 
@@ -62,7 +63,8 @@ async def _poll_dialog(
                 best_score = sum(bool(best[key]) for key in ("date_joined", "country"))
                 if score and score >= best_score:
                     best = parsed
-                if parsed["date_joined"] and parsed["country"]:
+                required = required_fields or ("date_joined", "country")
+                if all(parsed[key] for key in required):
                     return parsed
         # Count once per polling cycle, never once per overlapping selector.
         if cycle_text is not None and cycle_text == previous_text:

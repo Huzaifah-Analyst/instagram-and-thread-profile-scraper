@@ -1,4 +1,10 @@
-> **Latest update ? Round 8:** output selection, clipboard/CSV/Excel and history
+> **Latest update, 17 October 2026:** individual What to Check cards, field
+> export presets, Alive row filters and live snapshot exports implemented.
+> Full suite: 427 passed. See the
+> [shared dated report](2026-10-17-selectable-checks-and-exports.md).
+> Older measurements below are historical, not a new benchmark.
+
+> **Historical Round 8 update:** output selection, clipboard/CSV/Excel and history
 > implemented; 222 tests pass. Fresh 100-target IG-only 584.6s and Threads-only
 > 359.9s; both exceed 300s and have extraction failures. Historical Combined
 > baseline is 410.5s. Checker 5 was usable for these runs; the older login

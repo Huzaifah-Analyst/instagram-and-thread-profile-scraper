@@ -70,6 +70,29 @@ Pick one on the left before pressing Start.
 
 ## 3. The left panel
 
+**What to Check** lets you combine individual fields, as in the supplied
+reference picture. Use IG Alive, Threads Alive, IG Country, Threads Country,
+IG Age (joined date), and Threads Age (joined date). **IG + Threads Alive** is
+a shortcut controlling the two Alive boxes; it does not duplicate checks.
+
+For example, untick everything except **IG Alive** and **IG Country** to read
+IG status and country. Add **IG Age** to request its joined month/year too.
+Age means the platform's reported joined date, not a calculated exact age.
+At least one checkbox must remain selected before Start.
+
+Clicking a checking-mode preset resets the checkboxes to that preset. Editing
+a checkbox switches to a custom selection and shows its count. **Combined
+remains the startup default.** Preset Smart Combined keeps its conditional
+Threads behavior until you edit individual checks; custom selections visit
+each explicitly selected platform without that conditional omission.
+
+Only IG Alive by itself uses the anonymous no-login path. Other selections
+use saved login sessions for the selected platforms. Status-only platform
+checks stop after profile identity, without opening About. Country/date
+choices read the shared About panel and keep only requested metadata. A
+country/date check necessarily reads profile status as part of validation.
+Excluded fields are shown as **Not checked**.
+
 - **Input Usernames:** paste usernames, one per line. The count appears top
   right of the box.
 - **Load .txt File:** import a plain text list instead of pasting.
@@ -140,7 +163,7 @@ values in their own cells. These labels apply to both Instagram and Threads.
 
 | Cell label | Meaning |
 | --- | --- |
-| **Not checked** | The selected mode did not visit this platform. |
+| **Not checked** | The field or platform was excluded by the selected checks or mode. |
 | **Skipped (IG country)** | Smart Combined already obtained a real IG country, so Threads was skipped. |
 | **Unavailable (status only)** | Logged-out IG Status Only cannot collect country or joined date. |
 | **No account** | This platform returned not found, with no country-availability state. |
@@ -209,6 +232,25 @@ the country row was not shown, while `not_shared` means the platform printed
 Available columns: Username, Status, IG Country, IG Joined, Threads Country,
 Threads Joined, Threads Badge, Data Quality, IG Status, Threads Status,
 Seconds, Error, IG Country Availability, Threads Country Availability.
+
+**Select Output** also provides quick presets: **Full export**, **Alive/status
+only**, **Country only**, **Age/joined only**, and **Checked fields**. Choose a
+preset, adjust any individual columns, then press OK. Cancel discards the
+draft. Full export includes every supported column for data already collected;
+it does not run extra checks. Checked fields follows the results' stored check
+selection, or the panel selection if no results exist yet.
+
+**Copy/export rows** chooses All results, IG Alive only, Threads Alive only,
+or Both Alive only. Alive includes active and private profiles with explicit
+platform status; Unknown, errors, skipped platforms and Not found do not
+qualify. A Smart-skipped Threads profile cannot qualify as Threads Alive.
+History has the same row filters, defaulting to All results when opened.
+
+**Live export:** once the first completed result appears, copy, CSV and Excel
+remain available while checking continues. Each action takes a snapshot of
+finished rows so far, applying the selected columns and row filter. It does
+not stop the batch, and the file does not keep appending later arrivals.
+Export again after more rows finish or use history for the final batch.
 
 ---
 

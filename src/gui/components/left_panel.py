@@ -18,6 +18,8 @@ from src.core.modes import (
 from src.gui import theme
 from src.gui.bridge import RunState
 from src.core.validation import positive_seconds
+from src.core.check_plan import mode_for_checks, normalize_checks
+from src.gui.components.check_selection import CheckSelection
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +54,8 @@ class LeftPanel(ctk.CTkScrollableFrame):
         """
         super().__init__(master, width=theme.LEFT_PANEL_WIDTH, fg_color=theme.BG_SURFACE, corner_radius=0)
         self.grid_columnconfigure(0, weight=1)
+        self._on_mode_callback = on_mode_changed
+        self._custom_checks = False
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 6))
@@ -73,17 +77,19 @@ class LeftPanel(ctk.CTkScrollableFrame):
                                            border_color=theme.BORDER_COLOR, border_width=1, font=theme.FONT_BODY)
         self.import_button.grid(row=2, column=0, sticky="ew", padx=16, pady=(8, 16))
 
-        ctk.CTkLabel(self, text="Checking Mode", font=theme.FONT_SECTION,
-                     text_color=theme.TEXT_PRIMARY).grid(row=3, column=0, sticky="w", padx=16, pady=(0, 6))
+        ctk.CTkLabel(
+            self, text="Checking Mode (presets)", font=theme.FONT_SECTION,
+            text_color=theme.TEXT_PRIMARY,
+        ).grid(row=4, column=0, sticky="w", padx=16, pady=(8, 6))
         self.mode_var = ctk.StringVar(value=MODE_COMBINED)
         self._mode_buttons: list[ctk.CTkRadioButton] = []
         mode_frame = ctk.CTkScrollableFrame(self, height=155, fg_color="transparent")
-        mode_frame.grid(row=4, column=0, rowspan=3, sticky="ew", padx=12)
+        mode_frame.grid(row=5, column=0, rowspan=3, sticky="ew", padx=12)
         self._mode_labels: list[ctk.CTkLabel] = []
         for row, (value, label) in enumerate(MODE_LABELS):
             button = ctk.CTkRadioButton(
                 mode_frame, text="", value=value, variable=self.mode_var, width=28,
-                command=on_mode_changed, fg_color=theme.ACCENT_BLUE,
+                command=self._preset_changed, fg_color=theme.ACCENT_BLUE,
             )
             button.grid(row=row, column=0, sticky="nw", pady=4)
             caption = ctk.CTkLabel(
@@ -95,8 +101,15 @@ class LeftPanel(ctk.CTkScrollableFrame):
             self._mode_buttons.append(button)
             self._mode_labels.append(caption)
 
+        checks_frame = ctk.CTkFrame(self, fg_color="transparent")
+        checks_frame.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 0))
+        ctk.CTkLabel(
+            checks_frame, text="What to Check", font=theme.FONT_SECTION,
+        ).pack(anchor="w", padx=4, pady=(0, 6))
+        self.checks_panel = CheckSelection(checks_frame, self._checks_changed)
+        self.checks_panel.pack(fill="x")
         workers_row = ctk.CTkFrame(self, fg_color="transparent")
-        workers_row.grid(row=7, column=0, sticky="ew", padx=16, pady=(12, 0))
+        workers_row.grid(row=8, column=0, sticky="ew", padx=16, pady=(12, 0))
         ctk.CTkLabel(workers_row, text="Parallel workers", font=theme.FONT_SECTION,
                      text_color=theme.TEXT_PRIMARY).pack(side="left")
         self.workers_var = ctk.StringVar(value=str(DEFAULT_WORKERS))
@@ -112,7 +125,7 @@ class LeftPanel(ctk.CTkScrollableFrame):
         # Previously only the CLI's --dialog-timeout/--menu-click-timeout could
         # change these; the GUI silently always used the module defaults.
         timeouts_row = ctk.CTkFrame(self, fg_color="transparent")
-        timeouts_row.grid(row=8, column=0, sticky="ew", padx=16, pady=(10, 0))
+        timeouts_row.grid(row=9, column=0, sticky="ew", padx=16, pady=(10, 0))
         timeouts_row.grid_columnconfigure((1, 3), weight=1)
         ctk.CTkLabel(timeouts_row, text="Dialog (s)", font=theme.FONT_CAPTION,
                      text_color=theme.TEXT_MUTED).grid(row=0, column=0, sticky="w")
@@ -134,17 +147,21 @@ class LeftPanel(ctk.CTkScrollableFrame):
             self, text="🐛  Save debug captures", variable=self.debug_dump_var, font=theme.FONT_CAPTION,
             text_color=theme.TEXT_MUTED, fg_color=theme.ACCENT_BLUE, hover_color=theme.ACCENT_HOVER,
         )
-        self.debug_dump_check.grid(row=9, column=0, sticky="w", padx=16, pady=(8, 0))
+        self.debug_dump_check.grid(
+            row=10, column=0, sticky="w", padx=16, pady=(8, 0),
+        )
 
-        ctk.CTkLabel(self, text="Controls", font=theme.FONT_SECTION,
-                     text_color=theme.TEXT_PRIMARY).grid(row=10, column=0, sticky="w", padx=16, pady=(16, 6))
+        ctk.CTkLabel(
+            self, text="Controls", font=theme.FONT_SECTION,
+            text_color=theme.TEXT_PRIMARY,
+        ).grid(row=11, column=0, sticky="w", padx=16, pady=(16, 6))
         self.start_button = ctk.CTkButton(self, text="▶  Start Checking", command=on_start, height=38,
                                           fg_color=theme.ACCENT_BLUE, hover_color=theme.ACCENT_HOVER,
                                           font=theme.FONT_SECTION)
-        self.start_button.grid(row=11, column=0, sticky="ew", padx=16)
+        self.start_button.grid(row=12, column=0, sticky="ew", padx=16)
 
         row_frame = ctk.CTkFrame(self, fg_color="transparent")
-        row_frame.grid(row=12, column=0, sticky="ew", padx=16, pady=(8, 16))
+        row_frame.grid(row=13, column=0, sticky="ew", padx=16, pady=(8, 16))
         row_frame.grid_columnconfigure((0, 1), weight=1)
         self.pause_button = ctk.CTkButton(row_frame, text="❚❚  Pause", command=on_pause_toggle,
                                           fg_color=theme.BG_ELEVATED, hover_color=theme.BORDER_COLOR,
@@ -160,6 +177,31 @@ class LeftPanel(ctk.CTkScrollableFrame):
     def usernames(self) -> list[str]:
         """Returns the cleaned, de-duplicated usernames from the textbox."""
         return clean_usernames(self.textbox.get("1.0", "end").splitlines())
+
+    @property
+    def requested_checks(self) -> tuple[str, ...] | None:
+        """Preserve presets; pass fields only after a checkbox edit."""
+        return self.checks_panel.selection if self._custom_checks else None
+
+    def validate_checks(self) -> None:
+        """Reject empty custom scope before clearing existing results."""
+        if self._custom_checks:
+            normalize_checks(self.checks_panel.selection)
+
+    def _preset_changed(self) -> None:
+        """Restore a mode's complete scope after a radio preset is selected."""
+        self._custom_checks = False
+        self.checks_panel.set_preset(self.mode)
+        if self._on_mode_callback:
+            self._on_mode_callback()
+
+    def _checks_changed(self) -> None:
+        """Route a custom field combination through the needed session mode."""
+        self._custom_checks = True
+        if self.checks_panel.selection:
+            self.mode_var.set(mode_for_checks(self.checks_panel.selection))
+        if self._on_mode_callback:
+            self._on_mode_callback()
 
     @property
     def mode(self) -> str:
@@ -214,6 +256,7 @@ class LeftPanel(ctk.CTkScrollableFrame):
         self.dialog_timeout_entry.configure(state=input_state)
         self.menu_timeout_entry.configure(state=input_state)
         self.debug_dump_check.configure(state=input_state)
+        self.checks_panel.set_enabled(idle and start_allowed)
 
     def _import_file(self) -> None:
         """Loads a .txt file of usernames into the textbox."""

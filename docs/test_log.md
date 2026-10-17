@@ -196,3 +196,22 @@
 - PyInstaller rebuild succeeded. New EXE runtime/clean-machine acceptance and
   client cold-start reproduction remain unverified. No logged-in batch ran.
 - [Report and evidence](implementation/status-clarity-and-cold-start.md).
+
+
+## Selectable checks and exports (17 October 2026)
+
+- Branch feature/selectable-checks-and-exports, based on 85dd8ec.
+- Two first focused attempts were interrupted after partial progress while
+  correcting a new sleep mock that also affected Playwright transport.
+  Replaced it with a scoped delegating spy; no fixture assertions removed.
+- Next focused run: 99 passed, 1 failed in 17.02s. The shared GUI reset its
+  preset variable but not the new checkbox state. Extended fixture isolation
+  to reset both, preserving actual checkbox assertions.
+- Full suite: 427 passed in 101.57s, zero skips. Includes all 63 valid check
+  combinations, extraction scope and grading, real Chromium required-field
+  polling, real Tk controls, field presets, Alive history filters and a real
+  bridge run with clipboard/CSV/XLSX export before completion.
+- Later edits were formatting/docstrings only; semantic AST comparison across
+  all production/test modules found zero differences from the tested version.
+- No live platform benchmark or accuracy claim. Shared report and evidence:
+  implementation/2026-10-17-selectable-checks-and-exports.md.

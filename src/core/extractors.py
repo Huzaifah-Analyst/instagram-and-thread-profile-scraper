@@ -117,6 +117,7 @@ async def _options(page: Page, platform: str, budget: float) -> Optional[Locator
 async def _extract(
     page: Page, username: str, platform: str, page_ready_timeout_s: float,
     dialog_timeout_s: float, menu_click_timeout_s: float, debug_dump: bool,
+    requested_fields: tuple[str, ...] | None = None,
 ) -> dict:
     """Execute a staged check with truthful partial/error results and captures."""
     username = clean_usernames([username])[0]
@@ -145,6 +146,9 @@ async def _extract(
             await _failure(page, result, f"{label} profile identity could not be verified")
             return result
         result["status"] = STATUS_PRIVATE if is_private_profile(body) else STATUS_ACTIVE
+        if requested_fields == ():
+            result["stage"] = "complete"
+            return result
         result["stage"] = "profile_menu"
         # Round 6, 2026-10-13 live evidence (docs/implementation/round6-menu-retry.md):
         # a 12-account recheck showed the "More" menu and the About panel each
@@ -191,11 +195,33 @@ async def _extract(
                 page, selectors, max_chars=2000, dialog_timeout_s=dialog_timeout_s,
                 debug_sink=captured.append if debug_dump else None,
                 expected_username=username,
+                **({"required_fields": requested_fields}
+                   if requested_fields is not None else {}),
             )
             if parsed["date_joined"] or parsed["country"] or attempt + 1 >= attempts:
                 break
             await _dismiss(page)
         result.update(parsed)
+        if requested_fields is not None:
+            missing = [name for name in requested_fields if not parsed[name]]
+            if "country" in requested_fields:
+                if parsed["country"]:
+                    result["country_availability"] = (
+                        "disclosed" if country_is_disclosed(parsed["country"])
+                        else "not_shared"
+                    )
+                elif parsed["date_joined"]:
+                    result["country_availability"] = "not_disclosed"
+                    missing.remove("country")
+            if missing:
+                await _failure(
+                    page, result,
+                    f"{label} About: not available/loaded: "
+                    f"{', '.join(missing)}",
+                )
+            else:
+                result["stage"] = "complete"
+            return result
         missing = [name for name in ("date_joined", "country") if not parsed[name]]
         if parsed["country"] and not country_is_disclosed(parsed["country"]):
             result["country_availability"] = "not_shared"
@@ -239,10 +265,12 @@ async def extract_instagram(
     dialog_timeout_s: float = DIALOG_TIMEOUT_S,
     menu_click_timeout_s: float = MENU_CLICK_TIMEOUT_S,
     debug_dump: bool = False,
+    requested_fields: tuple[str, ...] | None = None,
 ) -> dict:
     """Read Instagram transparency from a verified target profile/dialog."""
     return await _extract(page, username, "ig", page_ready_timeout_s,
-                          dialog_timeout_s, menu_click_timeout_s, debug_dump)
+                          dialog_timeout_s, menu_click_timeout_s, debug_dump,
+                          requested_fields)
 
 
 async def extract_threads(
@@ -251,7 +279,9 @@ async def extract_threads(
     dialog_timeout_s: float = DIALOG_TIMEOUT_S,
     menu_click_timeout_s: float = MENU_CLICK_TIMEOUT_S,
     debug_dump: bool = False,
+    requested_fields: tuple[str, ...] | None = None,
 ) -> dict:
     """Read Threads transparency or report the login/menu failure stage."""
     return await _extract(page, username, "threads", page_ready_timeout_s,
-                          dialog_timeout_s, menu_click_timeout_s, debug_dump)
+                          dialog_timeout_s, menu_click_timeout_s, debug_dump,
+                          requested_fields)

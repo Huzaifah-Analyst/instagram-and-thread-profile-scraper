@@ -7,6 +7,7 @@ from typing import Callable, Optional
 import customtkinter as ctk
 
 from src.gui import theme
+from src.core.export_selection import ROW_FILTERS
 
 
 COPY_LABEL = "📋  Copy for Google Sheets"
@@ -54,8 +55,24 @@ class StatusBar(ctk.CTkFrame):
                                      font=theme.FONT_CAPTION, text_color=theme.TEXT_MUTED, anchor="w")
         self._message.grid(row=1, column=0, columnspan=4, sticky="ew", padx=16, pady=(0, 6))
 
+        filters = ctk.CTkFrame(self, fg_color="transparent")
+        filters.grid(row=2, column=0, columnspan=4, sticky="ew", padx=16)
+        ctk.CTkLabel(filters, text="Copy/export rows:").pack(side="left")
+        self.row_filter_var = ctk.StringVar(value=ROW_FILTERS[0])
+        self.row_filter_menu = ctk.CTkOptionMenu(
+            filters, values=list(ROW_FILTERS), variable=self.row_filter_var,
+            width=185,
+        )
+        self.row_filter_menu.pack(side="left", padx=8)
+        ctk.CTkLabel(
+            filters, text="Live export: finished rows so far",
+            font=theme.FONT_CAPTION,
+        ).pack(side="left")
+
         actions = ctk.CTkFrame(self, fg_color="transparent")
-        actions.grid(row=2, column=0, columnspan=4, sticky="ew", padx=16, pady=(0, 12))
+        actions.grid(
+            row=3, column=0, columnspan=4, sticky="ew", padx=16, pady=(8, 12),
+        )
         self.copy_button = ctk.CTkButton(actions, text=COPY_LABEL, command=on_copy, width=210,
                                          fg_color=theme.ACCENT_BLUE, hover_color=theme.ACCENT_HOVER,
                                          font=theme.FONT_BODY)
