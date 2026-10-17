@@ -3,6 +3,7 @@
 from src.core.about_parser import country_is_disclosed
 from src.core.modes import (
     MODE_COMBINED, MODE_IG_ONLY, MODE_IG_STATUS_ONLY, MODE_THREADS_ONLY,
+    ANONYMOUS_MODES, MODE_COMBINED_STATUS_ONLY, MODE_THREADS_STATUS_ONLY,
 )
 
 CHECK_LABELS = (
@@ -30,6 +31,10 @@ def mode_for_checks(checks: tuple[str, ...]) -> str:
     chosen = normalize_checks(checks)
     if chosen == ("ig_alive",):
         return MODE_IG_STATUS_ONLY
+    if chosen == ("threads_alive",):
+        return MODE_THREADS_STATUS_ONLY
+    if set(chosen) == {"ig_alive", "threads_alive"}:
+        return MODE_COMBINED_STATUS_ONLY
     ig = any(name.startswith("ig_") for name in chosen)
     threads = any(name.startswith("threads_") for name in chosen)
     return MODE_COMBINED if ig and threads else (
@@ -41,6 +46,10 @@ def checks_for_mode(mode: str) -> tuple[str, ...]:
     """Populate checkboxes from a legacy preset, preserving its scope."""
     if mode == MODE_IG_STATUS_ONLY:
         return ("ig_alive",)
+    if mode == MODE_THREADS_STATUS_ONLY:
+        return ("threads_alive",)
+    if mode == MODE_COMBINED_STATUS_ONLY:
+        return ("ig_alive", "threads_alive")
     if mode in (MODE_IG_ONLY, MODE_THREADS_ONLY):
         prefix = "ig_" if mode == MODE_IG_ONLY else "threads_"
         return tuple(name for name in CHECK_NAMES if name.startswith(prefix))
@@ -90,7 +99,7 @@ def apply_check_selection(record: dict, checks: tuple[str, ...]) -> None:
         }
     if "threads_age" not in checks:
         record["threads_badge"] = None
-    if record.get("checking_mode") == MODE_IG_STATUS_ONLY:
+    if record.get("checking_mode") in ANONYMOUS_MODES:
         return
     if all(satisfied) and not record.get("error_message"):
         record["data_quality"] = "Complete"

@@ -1,0 +1,25 @@
+{
+  "new_code_style_violations": [],
+  "prohibited_dash_characters_in_added_text": 0,
+  "artifact": "dist\\alive-fast\\MetaInspectorDesktop.exe",
+  "bytes": 325084187,
+  "sha256": "108ce4df560070ed9d2a1e37619cb78e588975fc487235c6383e1a823bec14a9",
+  "build_succeeded": true,
+  "build_seconds": 132.695,
+  "launch_verified": false,
+  "launch_failure": "An Application Control policy has blocked this file.",
+  "failure_layer": "Windows operating system, not tool approval",
+  "user_running_app_modified": false,
+  "full_suite": {
+    "passed": 471,
+    "skipped": 0,
+    "seconds": 62.94
+  },
+  "source_gui_status_cells": 190,
+  "source_gui_mismatches": 0,
+  "live_final_seconds": 137.969,
+  "live_error_rows": 0,
+  "production_files": 52,
+  "largest_production_file_lines": 472,
+  "supplied_credential_matches": 0
+}

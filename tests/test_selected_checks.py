@@ -17,6 +17,7 @@ from src.core.dialogs import _poll_dialog
 from src.core.export_selection import export_preset, filter_records
 from src.core.extractors import extract_instagram, extract_threads
 from src.core.scraper import MultiWorkerScraper
+from src.core.modes import ANONYMOUS_MODES
 from src.gui.components.data_table import metadata_cell
 from test_accuracy_regressions import run_browser
 
@@ -37,8 +38,8 @@ def test_all_nonempty_combinations_choose_only_required_platforms(
     assert scraper.checks == normalize_checks(checks)
     ig = any(name.startswith("ig_") for name in checks)
     threads = any(name.startswith("threads_") for name in checks)
-    if checks == ("ig_alive",):
-        assert mode == "ig_status_only" and scraper.checkers == []
+    if set(checks) <= {"ig_alive", "threads_alive"}:
+        assert mode in ANONYMOUS_MODES and scraper.checkers == []
     else:
         expected = "combined" if ig and threads else (
             "ig_only" if ig else "threads_only"
@@ -89,6 +90,22 @@ def test_dispatcher_passes_exact_fields_and_masks_incidental_data(
             f"src.core.selected_checks.extract_{name}", extract,
         )
     scraper = MultiWorkerScraper(checks=checks)
+    if scraper.mode in ANONYMOUS_MODES:
+        # Alive-only now uses public readers instead of logged-in extractors.
+        public = AsyncMock(return_value={
+            "status": "active", "stage": "status_only", "error": None,
+        })
+        monkeypatch.setattr("src.core.alive_records.read_public", public)
+        record = asyncio.run(scraper._check_account(object(), "target"))
+        assert public.await_count == (1 if checks == ("threads_alive",) else 2)
+        assert record["data_quality"] == "Status only"
+        assert all(record[field] is None for field in (
+            "ig_country", "ig_date_joined", "threads_country",
+            "threads_date_joined", "threads_badge",
+        ))
+        for extract in extractors.values():
+            extract.assert_not_awaited()
+        return
     record = asyncio.run(scraper._check_account(object(), "target"))
     assert record["requested_checks"] == list(checks)
     assert record["data_quality"] == "Complete"

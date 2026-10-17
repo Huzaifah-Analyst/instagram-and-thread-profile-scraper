@@ -436,3 +436,12 @@ No new full-list benchmark or proof of other physical display configurations.
 | P97 | Timing explained / speed improvement unmeasured | User's saved Alive-only run took 300.06s; IG 85 active and Threads 48 active. Sequential platform navigation and existing worker pacing contribute. Removed unnecessary Escape calls from Alive-only extractors; no fresh runtime saving or platform accuracy claim. |
 
 [Changes and dated evidence](implementation/2026-10-17-checks-and-live-columns.md).
+
+## Public-first Alive follow-up (17 October 2026)
+
+| ID | State | Evidence and action |
+| --- | --- | --- |
+| P98 | Implemented and verified live | Threads Alive and both-Alive selections now use fresh public pages first. Public-only prototype resolved 48 Threads statuses but 47 redirected to login. User selected saved-login verification for unclear results. Final production run resolved all 95 targets with zero error rows and zero platform-status differences from the saved user run. Login redirects are never guessed Not found. |
+| P99 | Improved / 120-second acceptance remains open | User's saved both-Alive run was 300.06s. Fresh first implementation was 191.015s; separating public and paced verification queues measured 137.969s. All runs are individual measurements, not averages. Final run exceeds 120s by 17.969s; account pacing remains on saved-login requests only. |
+
+[Shared report, measured evidence and remaining limits](implementation/2026-10-17-public-first-alive.md).

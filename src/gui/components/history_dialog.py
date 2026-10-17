@@ -40,6 +40,8 @@ def run_to_row(run: dict) -> tuple[str, ...]:
         {"combined": "Combined", "ig_only": "Instagram Only",
          "threads_only": "Threads Only",
          "combined_smart": "Smart Combined",
+         "threads_status_only": "Threads Alive",
+         "combined_status_only": "IG + Threads Alive",
          "ig_status_only": "IG Status Only"}.get(run["mode"], str(run["mode"])),
         str(run["total_accounts"]),
         str(run["active_count"]),

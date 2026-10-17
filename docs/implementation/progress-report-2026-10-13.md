@@ -1,4 +1,10 @@
-> **Latest update, 17 October 2026:** Checking Mode presets removed; What to
+> **Latest update, 17 October 2026:** public-first both-Alive checks implemented.
+> Fresh 95-target run: **137.969s, zero error rows**, 85 IG Active and 48 Threads
+> Active. IG used public pages for all 95; Threads needed saved-login confirmation
+> for 47. Full suite: **471 passed**. The 120-second goal is still not met.
+> [Current shared report](2026-10-17-public-first-alive.md).
+
+> **Earlier update, 17 October 2026:** Checking Mode presets removed; What to
 > Check now controls matching Live Results columns, including separate IG
 > Alive and Threads Alive. 449 tests pass. Saved 95-row replay verified 190
 > status cells with zero mismatches. No fresh speed benchmark. See the

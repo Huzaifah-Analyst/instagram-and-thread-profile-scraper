@@ -1,11 +1,14 @@
 # MetaInspector Desktop Quick Start
 
 Windows 10/11, 64-bit. Use the supplied `MetaInspectorDesktop.exe`.
-The 17 October follow-up build is `dist/updated/MetaInspectorDesktop.exe`;
+The 17 October public-first Alive build is `dist/alive-fast/MetaInspectorDesktop.exe`;
 close the older app before checking with this build.
+On the verification machine, Windows Application Control blocked this new
+artifact's launch. Its build succeeded, but runtime is not yet verified.
+See the [current delivery report](implementation/2026-10-17-public-first-alive.md).
 No Python or Playwright installation is required by this bundled build.
 Local verification and its limits are recorded in
-[the packaged-build report](implementation/bl01-packaged-verification.md).
+  [the earlier packaged-build report](implementation/bl01-packaged-verification.md).
 
 ## 1. First launch
 
@@ -24,7 +27,9 @@ Local verification and its limits are recorded in
 
 ## 2. Checker setup
 
-Skip this section when **only IG Alive** is selected.
+Skip this section when **only IG Alive** is selected. Threads Alive and both
+Alive start with public pages too; an existing saved login is used only when
+a public result is unclear. Without one, unclear results stay Unknown.
 
 1. With one checker selected, **Setup Checker Account** opens its setup browser
    directly. To choose accounts first, click **Manage checkers**.
@@ -65,9 +70,12 @@ selected. At least one must be selected. The desktop has no mode presets;
 legacy CLI modes remain available. Parallel workers remains at five by
 default. Scroll the left panel to reach input or controls on smaller screens.
 
-Only IG Alive by itself needs no login. Other selections use saved sessions
-for the requested platforms. Alive checks stop at profile identity and skip
-About panels. Country and Age share a panel, retaining only requested fields.
+IG Alive alone needs no login. Threads Alive and both Alive use fresh public
+pages first and verify unclear results through an enabled saved session.
+A Threads login redirect alone never means Not found. Public checks have no
+4-8 second account pause; saved-login verification retains its pacing.
+Country or Age selections use the existing logged-in flow. Alive checks skip
+About panels; Country and Age share a panel, retaining only requested fields.
 
 The table shows selected fields first, followed by Data, Duration and Error.
 Each Alive column and its header totals use that platform's own result.
@@ -75,8 +83,15 @@ Unknown or failed reads stay explicit. After completion, changing checks
 prepares the next run; existing records retain their recorded columns.
 
 Each anonymous attempt allows at least 30 seconds for a decision marker.
-Unknown targets receive one automatic retry after the main pass with the
-same warm context. If still Unknown, the Error field keeps the read reason.
+Unresolved public rendering receives one warm retry after the main pass.
+Explicit Threads login redirects go directly to saved-login verification,
+not a repeated public request. Unknown keeps its reason if verification fails.
+The new 95-target both-Alive production run took **137.969 seconds** with
+zero error rows and no omitted targets. IG used public pages for all 95;
+Threads used public pages for 48 and saved-login verification for 47. This
+single result exceeds the requested 120-second limit by 17.969 seconds.
+See the [dated report](implementation/2026-10-17-public-first-alive.md).
+
 On 15 October 2026, a 50-target CLI comparison returned 0 Unknown before and
 after, in 37.1s and 125.7s. This did not reproduce the client's packaged
 cold-start failure or establish a speed improvement. See the

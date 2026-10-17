@@ -1,0 +1,30 @@
+{
+  "source": "alive-public95-pipeline-rows.json",
+  "source_kind": "fresh production run replayed in source GUI",
+  "saved_wall_seconds": 137.96899999999732,
+  "rows_replayed": 95,
+  "ig_status": {
+    "not_found": 10,
+    "active": 85
+  },
+  "threads_status": {
+    "not_found": 47,
+    "active": 48
+  },
+  "status_cells_verified": 190,
+  "status_cell_mismatches": 0,
+  "record_errors": 0,
+  "visible_columns": [
+    "idx",
+    "username",
+    "ig_status",
+    "threads_status",
+    "quality",
+    "duration",
+    "error"
+  ],
+  "summary_label": "IG: 85 ACTIVE, 10 NOT FOUND | Threads: 48 ACTIVE, 47 NOT FOUND",
+  "row_seconds_sum": 928.1,
+  "row_seconds_mean": 9.769473684210526,
+  "fresh_live_run": false
+}

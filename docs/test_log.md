@@ -227,3 +227,24 @@
   zero mismatches. No fresh network check. An initial screenshot helper blocked
   its own Tk loop; keeping the loop responsive fixed the local capture.
 - [Report, build location and limits](implementation/2026-10-17-checks-and-live-columns.md).
+
+## 17 October 2026: public-first Alive and selective verification
+
+- First focused suite: 173 passed in 21.34s. Following queue separation and
+  added regressions: 178 passed in 18.94s.
+- Final complete suite: **471 passed in 62.94s, zero skips**. Includes actual
+  Chromium/Tk and regressions for fallback pacing, session-health caching,
+  disabled checker exclusion, challenge stop, warm retry, target accounting,
+  new GUI mode routing, exports and unchanged legacy extraction behavior.
+- Anonymous-only 95-target prototype: 142.406s, 47 unresolved Threads login
+  redirects. This was not a complete successful status run.
+- First production public-first run: 191.015s, 95 unique targets, zero errors.
+- Final independent-queue run: **137.969s**, 95 unique targets, exact target
+  set, zero errors/unstarted, IG 85 Active / 10 Not found, Threads 48 Active /
+  47 Not found. Same observed platform states as the user's saved run.
+- Actual source GUI replay of the fresh run: 190 status cells checked, zero
+  mismatches. Replay itself made no fresh network requests.
+- PyInstaller build succeeded, 325,084,187 bytes. Startup attempt with isolated
+  app data was refused by Windows Application Control. Packaged runtime is
+  unverified; no security-policy workaround or existing-app termination.
+- [Full evidence and packaging status](implementation/2026-10-17-public-first-alive.md).

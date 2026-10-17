@@ -12,7 +12,9 @@ from typing import Callable, Optional
 import customtkinter as ctk
 
 from src.core.scraper import MODE_COMBINED, MODE_IG_ONLY, MultiWorkerScraper, login_session
-from src.core.modes import MODE_IG_STATUS_ONLY, STATUS_ONLY_NOTICE
+from src.core.modes import (
+    MODE_IG_STATUS_ONLY, ANONYMOUS_MODES, status_notice,
+)
 from src.core.session import SESSION_CONNECTED, check_session
 from src.core.checkers import Checker, CheckerStore
 from src.core.credentials import AccountCredential
@@ -111,7 +113,7 @@ class MetaInspectorApp(ctk.CTk):
             dialog_timeout_s=self.left_panel.dialog_timeout_s,
             menu_click_timeout_s=self.left_panel.menu_click_timeout_s,
             debug_dump=self.left_panel.debug_dump, progress_callback=callback,
-            checkers=([] if mode == MODE_IG_STATUS_ONLY else
+            checkers=([] if mode in ANONYMOUS_MODES else
                       [slot for slot in self.checker_store.load() if slot.enabled]),
             persist_results=True,
             checks=self.left_panel.requested_checks,
@@ -123,8 +125,8 @@ class MetaInspectorApp(ctk.CTk):
 
     def _on_mode_changed(self) -> None:
         """Explain intentional scope limitations before a run starts."""
-        if self.left_panel.mode == MODE_IG_STATUS_ONLY:
-            self.status_bar.message(STATUS_ONLY_NOTICE)
+        if self.left_panel.mode in ANONYMOUS_MODES:
+            self.status_bar.message(status_notice(self.left_panel.mode))
         else:
             self.status_bar.message("Ready. Paste usernames and press Start.")
         if not self.table.records:
@@ -158,7 +160,7 @@ class MetaInspectorApp(ctk.CTk):
             self.status_bar.message(str(exc), "error")
             return
         self.status_bar.message(
-            STATUS_ONLY_NOTICE if mode == MODE_IG_STATUS_ONLY else
+            status_notice(mode) if mode in ANONYMOUS_MODES else
             "Verifying selected checker logins, then checking targets..."
         )
         self._apply_state()
@@ -360,9 +362,11 @@ class MetaInspectorApp(ctk.CTk):
 
     def _refresh_session(self) -> None:
         """Show saved-login presence honestly; only preflight verifies live health."""
-        if self.left_panel.mode == MODE_IG_STATUS_ONLY:
-            self._session_label.configure(text="Anonymous status checks: no login needed",
-                                          text_color=theme.TEXT_MUTED)
+        if self.left_panel.mode in ANONYMOUS_MODES:
+            label = ("Anonymous status checks: no login needed"
+                     if self.left_panel.mode == MODE_IG_STATUS_ONLY else
+                     "Public Alive checks; saved login only for unclear results")
+            self._session_label.configure(text=label, text_color=theme.TEXT_MUTED)
             return
         try:
             selected = [slot for slot in self.checker_store.load() if slot.enabled]

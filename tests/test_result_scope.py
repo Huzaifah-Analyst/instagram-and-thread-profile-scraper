@@ -59,14 +59,16 @@ def test_selected_alive_preserves_independent_observations(
     monkeypatch: pytest.MonkeyPatch, ig: str, threads: str,
 ) -> None:
     """Selected checks retain raw statuses even when legacy linking differs."""
-    for name, status in (("instagram", ig), ("threads", threads)):
-        monkeypatch.setattr(
-            f"src.core.selected_checks.extract_{name}",
-            AsyncMock(return_value={
-                "status": status, "stage": "complete",
-                "error": "Unreadable profile" if status == "error" else None,
-            }),
-        )
+    async def read(
+        page: object, username: str, platform: str, timeout: float,
+    ) -> dict:
+        """Return independent public observations without linked statuses."""
+        status = ig if platform == "ig" else threads
+        return {
+            "status": status, "stage": "status_only",
+            "error": "Unreadable profile" if status == "error" else None,
+        }
+    monkeypatch.setattr("src.core.alive_records.read_public", read)
     scraper = MultiWorkerScraper(checks=("ig_alive", "threads_alive"))
     record = asyncio.run(scraper._check_account(object(), "fixture"))
     assert record["ig_status"] == ig

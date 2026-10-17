@@ -22,6 +22,8 @@ def gui_root(tmp_path_factory: pytest.TempPathFactory) -> Iterator[MetaInspector
 
 @pytest.mark.parametrize("mode,checks", [
     ("combined", CHECK_NAMES), ("ig_status_only", ("ig_alive",)),
+    ("threads_status_only", ("threads_alive",)),
+    ("combined_status_only", ("ig_alive", "threads_alive")),
 ])
 def test_gui_forwards_new_mode_unchanged(gui_root: MetaInspectorApp, monkeypatch: pytest.MonkeyPatch,
                                        mode: str, checks: tuple[str, ...]) -> None:
@@ -30,7 +32,7 @@ def test_gui_forwards_new_mode_unchanged(gui_root: MetaInspectorApp, monkeypatch
     try:
         app.update()
         assert app.left_panel.mode == "combined"
-        if mode == "ig_status_only":
+        if mode.endswith("status_only"):
             def reject_checker_load() -> None:
                 """An anonymous mode must not require valid checker configuration."""
                 raise AssertionError("Checker configuration accessed")
@@ -51,6 +53,10 @@ def test_gui_forwards_new_mode_unchanged(gui_root: MetaInspectorApp, monkeypatch
             assert engine.checkers == []
             assert "unavailable without login" in app.status_bar._message.cget("text")
             assert "no login needed" in app._session_label.cget("text")
+        elif mode.endswith("status_only"):
+            assert engine.checkers == []
+            assert "saved login verifies unclear" in app.status_bar._message.cget("text")
+            assert "saved login only" in app._session_label.cget("text")
         captions = [widget.cget("text") for child in app.left_panel.winfo_children()
                     for widget in child.winfo_children() if isinstance(widget, ctk.CTkLabel)]
         assert "Parallel workers" in captions

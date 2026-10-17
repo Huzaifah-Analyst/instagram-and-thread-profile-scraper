@@ -47,7 +47,7 @@ from src.core.about_parser import country_is_disclosed
 
 from src.core.modes import (
     MODE_IG_ONLY, MODE_THREADS_ONLY, MODE_COMBINED, MODE_COMBINED_SMART,
-    MODE_IG_STATUS_ONLY, MODES,
+    MODE_IG_STATUS_ONLY, MODES, ANONYMOUS_MODES,
 )
 from src.core.result_records import build_record
 from src.core.check_plan import (
@@ -152,9 +152,9 @@ class MultiWorkerScraper:
         for budget in (page_ready_timeout_s, dialog_timeout_s, menu_click_timeout_s):
             positive_seconds(budget)
         self.checkers = checkers if checkers is not None else [Checker("checker_1", Path(profile_dir), True)]
-        if mode == MODE_IG_STATUS_ONLY:
+        if mode in ANONYMOUS_MODES:
             self.checkers = []
-        if mode != MODE_IG_STATUS_ONLY and (not self.checkers or len(self.checkers) > 5):
+        if mode not in ANONYMOUS_MODES and (not self.checkers or len(self.checkers) > 5):
             raise ValueError("Select between 1 and 5 checkers.")
         paths = {str(checker.profile_dir.resolve()).casefold() for checker in self.checkers}
         if len(paths) != len(self.checkers):
@@ -250,6 +250,10 @@ class MultiWorkerScraper:
             from src.core.anonymous_status import run_anonymous
 
             records = await run_anonymous(self, users)
+        elif self.mode in ANONYMOUS_MODES:
+            from src.core.alive_pool import run_alive
+
+            records = await run_alive(self, users)
         else:
             records = await run_pool(self, users)
         processed = {record["username"] for record in records}
@@ -299,6 +303,14 @@ class MultiWorkerScraper:
 
             return await check_status(
                 page, username, anonymous_timeout_s(self.page_ready_timeout_s),
+            )
+        if self.mode in ANONYMOUS_MODES:
+            from src.core.alive_records import check_public_target
+            from src.core.anonymous_status import anonymous_timeout_s
+
+            return await check_public_target(
+                page, username, self.mode,
+                anonymous_timeout_s(self.page_ready_timeout_s),
             )
         if self.checks is not None:
             from src.core.selected_checks import run_selected
@@ -416,8 +428,8 @@ def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
-    if args.mode == MODE_IG_STATUS_ONLY and (args.login or args.login_checker):
-        parser.error("ig_status_only uses no login; omit --login and --login-checker")
+    if args.mode in ANONYMOUS_MODES and (args.login or args.login_checker):
+        parser.error("Status modes do not log in; omit --login and --login-checker")
     if args.login or args.login_checker:
         slot = CheckerStore(args.profile).load()[(args.login_checker or 1) - 1]
         print(asyncio.run(login_session(slot.profile_dir, expected_username=slot.username)))
@@ -429,9 +441,9 @@ def main() -> None:
     if not names:
         parser.error("give usernames or --file")
 
-    slots = [] if args.mode == MODE_IG_STATUS_ONLY else CheckerStore(args.profile).load()
+    slots = [] if args.mode in ANONYMOUS_MODES else CheckerStore(args.profile).load()
     selected = [slot for slot in slots if slot.enabled]
-    if args.checkers and args.mode != MODE_IG_STATUS_ONLY:
+    if args.checkers and args.mode not in ANONYMOUS_MODES:
         numbers = args.checkers.split(",")
         if not numbers or any(n not in {"1", "2", "3", "4", "5"} for n in numbers) or len(set(numbers)) != len(numbers):
             parser.error("--checkers must list distinct slots from 1 to 5")

@@ -29,8 +29,8 @@ All six start selected. The IG + Threads Alive shortcut controls both Alive
 boxes, so it does not add another request.
 
 - IG Alive alone uses the logged-out status checker and needs no login.
-- Threads Alive needs a saved Threads login. Both Alive checks use both
-  platform sessions and stop before their About panels.
+- Threads Alive and both Alive read public pages first. Only unclear results
+  use an enabled saved login. No usable saved login means Unknown, not a guess.
 - Country and Age require a login for that platform. Age is joined month/year.
 - Only requested platforms and metadata are checked. Country and Age on the
   same platform share one About panel.
@@ -58,9 +58,10 @@ The visible boxes are the complete request for the next run. Live result
 columns follow that request. Changing boxes after a run prepares the next
 run; existing rows retain their recorded columns until Start or history load.
 
-Only IG Alive by itself uses the anonymous no-login path. Other selections
-use saved login sessions for the selected platforms. Status-only platform
-checks stop after profile identity, without opening About. Country/date
+Alive-only selections use public pages without account pacing. Threads Alive
+and both Alive verify unclear results through saved sessions with normal
+pacing. Public work continues while those verifications wait. Country/date
+selections use saved login sessions. Alive checks do not open About. Country/date
 choices read the shared About panel and keep only requested metadata. A
 country/date check necessarily reads profile status as part of validation.
 Unselected field columns are hidden in current runs. Older history may show
@@ -69,9 +70,10 @@ Unselected field columns are hidden in current runs. Older history may show
 - **Input Usernames:** paste usernames, one per line. The count appears top
   right of the box.
 - **Load .txt File:** import a plain text list instead of pasting.
-- **Parallel workers:** how many accounts are checked at the same time, 1 to
-  5. Five is the normal setting. This is **not** the number of login accounts;
-  one healthy login can drive all five.
+- **Parallel workers:** worker limit from 1 to 5; five is the normal setting.
+  Both Alive uses up to five public targets with separate IG/Threads pages
+  and up to five saved-login verifications alongside them. It is not the
+  number of login accounts; one healthy saved login can supply the fallback.
 - **Dialog (s), default 10:** how long to wait for the transparency panel to
   show its values before giving up on that account. Raise it if you see many
   timeouts.
@@ -119,7 +121,7 @@ IG Status / Threads Status and IG Joined / Threads Joined.
   Re-run those rows. See section 8.
 - **CHECKER BLOCKED:** your own login account hit a security check. Stop and resolve
   the login before continuing.
-- **UNKNOWN:** IG Status Only could not find a clear marker on the page. It
+- **UNKNOWN:** an Alive check could not establish a clear result. It
   means "not sure", not "does not exist".
 
 ---
@@ -131,7 +133,7 @@ IG Status / Threads Status and IG Joined / Threads Joined.
   the Error column contains actual check failures, if any.
 - **Not available:** the account does not exist, so there is nothing to
   collect. This is a correct result, not a failure.
-- **Status only:** an IG Status Only row with a clear verdict.
+- **Status only:** every requested Alive check has a clear verdict.
 
 ---
 
@@ -256,8 +258,11 @@ Export again after more rows finish or use history for the final batch.
   re-run the failed rows.
 - **Status says BLOCKED:** your checker login hit a security challenge. Open
   Setup Checker Account, log in again, clear the challenge, then re-run.
-- **Header says no login saved:** run Setup Checker Account. Not needed for
-  IG Status Only.
+- **Threads Alive stays Unknown:** its public page may require login. Enable
+  a healthy saved checker in Manage checkers so unclear results can be verified.
+  If verification is unavailable, Unknown and its reason are retained.
+- **Header says no login saved:** set up a checker for metadata checks or
+  unclear Threads verification. Public Alive reads can still run without it.
 - **The whole run is slow:** select only the fields you need. Logged-in
   checks retain the existing 4-8 second pacing between targets per worker.
 - **Investigating a specific account:** turn on Save debug captures, run only

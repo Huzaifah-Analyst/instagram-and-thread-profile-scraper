@@ -1,0 +1,19 @@
+{
+  "kind": "prototype public-only reads, no retry or login fallback",
+  "elapsed": 142.40600000000268,
+  "returned": 95,
+  "unique": 95,
+  "ig_status": {
+    "active": 85,
+    "not_found": 10
+  },
+  "threads_status": {
+    "unknown": 47,
+    "active": 48
+  },
+  "threads_stage": {
+    "login_required": 47,
+    "status_only": 48
+  },
+  "errors": 47
+}
