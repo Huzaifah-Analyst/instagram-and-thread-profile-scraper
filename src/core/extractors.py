@@ -132,7 +132,10 @@ async def _extract(
         "div[aria-label='Column body'] h1, div[role='main'] h1"
     )
     try:
-        body = await _open_profile(page, url, ready, page_ready_timeout_s)
+        body = await _open_profile(
+            page, url, ready, page_ready_timeout_s,
+            status_only=requested_fields == (),
+        )
         result["source_url"] = page.url
         challenge = detect_session_challenge(page.url, body)
         if challenge:

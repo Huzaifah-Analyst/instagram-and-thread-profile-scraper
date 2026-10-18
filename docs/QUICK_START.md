@@ -1,11 +1,11 @@
 # MetaInspector Desktop Quick Start
 
 Windows 10/11, 64-bit. Use the supplied `MetaInspectorDesktop.exe`.
-The 17 October public-first Alive build is `dist/alive-fast/MetaInspectorDesktop.exe`;
+The 18 October public-first Alive build is `dist/alive-fast/MetaInspectorDesktop.exe`;
 close the older app before checking with this build.
-On the verification machine, Windows Application Control blocked this new
-artifact's launch. Its build succeeded, but runtime is not yet verified.
-See the [current delivery report](implementation/2026-10-17-public-first-alive.md).
+This rebuild's packaged window opened successfully. Its full saved-login
+benchmark and clean-machine acceptance remain unverified.
+See the [current delivery report](implementation/2026-10-18-alive-readiness.md).
 No Python or Playwright installation is required by this bundled build.
 Local verification and its limits are recorded in
   [the earlier packaged-build report](implementation/bl01-packaged-verification.md).
@@ -86,11 +86,13 @@ Each anonymous attempt allows at least 30 seconds for a decision marker.
 Unresolved public rendering receives one warm retry after the main pass.
 Explicit Threads login redirects go directly to saved-login verification,
 not a repeated public request. Unknown keeps its reason if verification fails.
-The new 95-target both-Alive production run took **137.969 seconds** with
+The retained 95-target both-Alive production run took **130.968 seconds** with
 zero error rows and no omitted targets. IG used public pages for all 95;
 Threads used public pages for 48 and saved-login verification for 47. This
-single result exceeds the requested 120-second limit by 17.969 seconds.
-See the [dated report](implementation/2026-10-17-public-first-alive.md).
+single result exceeds the requested 120-second limit by 10.968 seconds.
+Other experiments had errors and were not retained. The final navigation
+timeout guard was tested, but not followed by another full live benchmark.
+See the [dated report](implementation/2026-10-18-alive-readiness.md).
 
 On 15 October 2026, a 50-target CLI comparison returned 0 Unknown before and
 after, in 37.1s and 125.7s. This did not reproduce the client's packaged

@@ -131,9 +131,8 @@ def test_extractor_ignores_unrequested_panels_and_fields(
     monkeypatch: pytest.MonkeyPatch, platform: str, fields: tuple[str, ...],
 ) -> None:
     """Status avoids menus; country/date reads require only selected fields."""
-    monkeypatch.setattr(
-        "src.core.extractors._open_profile", AsyncMock(return_value="Profile"),
-    )
+    open_profile = AsyncMock(return_value="Profile")
+    monkeypatch.setattr("src.core.extractors._open_profile", open_profile)
     monkeypatch.setattr(
         "src.core.extractors.profile_matches", AsyncMock(return_value=True),
     )
@@ -159,6 +158,7 @@ def test_extractor_ignores_unrequested_panels_and_fields(
     ))
     assert result["status"] == "active"
     assert result["stage"] == "complete" and result["error"] is None
+    assert open_profile.await_args.kwargs["status_only"] is (fields == ())
     if fields:
         assert poll.await_args.kwargs["required_fields"] == fields
     else:

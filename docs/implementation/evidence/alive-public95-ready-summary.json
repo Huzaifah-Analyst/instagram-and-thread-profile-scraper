@@ -1,0 +1,36 @@
+{
+  "kind": "public-first Alive with early status-only decisions for public and fallback pages",
+  "elapsed": 130.96799999999348,
+  "returned": 95,
+  "unique": 95,
+  "exact_target_set": true,
+  "ig_status": {
+    "not_found": 10,
+    "active": 85
+  },
+  "threads_status": {
+    "not_found": 47,
+    "active": 48
+  },
+  "quality": {
+    "Status only": 95
+  },
+  "ig_source": {
+    "anonymous": 95
+  },
+  "threads_source": {
+    "saved_login": 47,
+    "anonymous": 48
+  },
+  "errors": 0,
+  "stop_reason": null,
+  "unstarted": 0,
+  "active_checkers": [
+    "checker_1"
+  ],
+  "under_120": false,
+  "differences_from_saved_run": {
+    "ig": 0,
+    "threads": 0
+  }
+}

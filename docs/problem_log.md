@@ -445,3 +445,24 @@ No new full-list benchmark or proof of other physical display configurations.
 | P99 | Improved / 120-second acceptance remains open | User's saved both-Alive run was 300.06s. Fresh first implementation was 191.015s; separating public and paced verification queues measured 137.969s. All runs are individual measurements, not averages. Final run exceeds 120s by 17.969s; account pacing remains on saved-login requests only. |
 
 [Shared report, measured evidence and remaining limits](implementation/2026-10-17-public-first-alive.md).
+
+## Alive readiness follow-up (18 October 2026)
+
+| ID | State | Evidence and action |
+| --- | --- | --- |
+| P99 | Still open / retained run 130.968s | 95 unique targets, zero errors, exact status agreement with saved user results. Exceeds 120s by 10.968s. Resource-blocker and scheduler experiments measured 242.531s with 7 errors and 333.094s with 9 errors; both rejected. No consistent under-two-minute claim. |
+| P100 | Guard implemented / Chromium regressions pass | Alive-only navigation can poll after document commit without waiting for unrelated deferred scripts. A navigation timeout propagates instead of reading a previous profile's DOM. Metadata/legacy Combined navigation behavior remains unchanged. Final guard tested in the 479-pass suite, but no fresh 95-target run after the guard. |
+
+Rebuilt EXE startup verified with isolated data. Preview journals without a
+saved login correctly retained 47 Threads Unknown results; packaged full-list
+fallback acceptance remains pending. Source GUI replay verified 190 status
+cells with zero mismatches. [Dated shared report](implementation/2026-10-18-alive-readiness.md).
+
+### P101: current metadata failures remain open
+
+User's completed all-six-fields run returned 48 active Threads profiles:
+22 country values, 4 literal Not shared, 9 date-only panels, 6 About-menu
+failures and 7 About-dialog failures. Active verifies profile existence,
+not metadata success. No raw captures in this run, so missing-country
+attribution and menu/panel root cause remain unverified. Alive-only speed
+acceptance does not cover this run.

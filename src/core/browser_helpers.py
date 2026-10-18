@@ -35,12 +35,18 @@ async def _body_text(page: Page) -> str:
 async def _open_profile(
     page: Page, url: str, ready_selector: str,
     page_ready_timeout_s: float = PAGE_READY_TIMEOUT_S,
+    *, status_only: bool = False,
 ) -> str:
     """Navigate and wait for a visible profile header or a known failure."""
     try:
-        await page.goto(url, wait_until="domcontentloaded", timeout=NAVIGATION_TIMEOUT_MS)
+        await page.goto(
+            url, wait_until="commit" if status_only else "domcontentloaded",
+            timeout=NAVIGATION_TIMEOUT_MS,
+        )
     except PlaywrightTimeoutError as exc:
         logger.warning("Navigation incomplete for %s: %s", url, exc)
+        if status_only:
+            raise
     deadline = time.monotonic() + page_ready_timeout_s
     body = ""
     while time.monotonic() < deadline:

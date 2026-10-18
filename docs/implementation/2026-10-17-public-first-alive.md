@@ -1,5 +1,9 @@
 # Public-first IG and Threads Alive checks
 
+> Follow-up, 18 October: retained Alive readiness changes measured 130.968s;
+> 479 tests pass and the rebuilt EXE starts. The 120-second goal remains open.
+> See [current evidence and rejected experiments](2026-10-18-alive-readiness.md).
+
 Date: **17 October 2026**. Branch: `feature/selectable-checks-and-exports`.
 Shared implementation and evidence report for Codex and Claude.
 
@@ -87,6 +91,21 @@ Aggregate evidence: [prototype](evidence/anonymous-both95-probe-summary.json),
 [first production run](evidence/alive-public95-production-summary.json),
 [final production run](evidence/alive-public95-pipeline-summary.json).
 Raw usernames, records and sessions remain local and ignored by Git.
+
+### Additional performance comparison
+
+Disabling the resource blocker on the same independent-queue implementation
+was measured separately: **242.531 seconds**, 95 rows, seven Threads Unknown
+results and seven error rows. IG remained 85 Active / 10 Not found; Threads
+was 48 Active / 40 Not found / 7 Unknown. This diagnostic is rejected as a
+default change. The selective blocker remains enabled.
+[Diagnostic aggregate](evidence/alive-public95-unfiltered-summary.json).
+
+The cache hypothesis was not established: this repository already uses
+selective CDP Fetch patterns rather than wildcard Playwright routes. The
+[Playwright routing documentation](https://playwright.dev/python/docs/api/class-browsercontext#browser-context-route)
+warns that routing disables the HTTP cache; that warning alone does not prove
+the existing selective blocker disables caching. No cache fix is claimed.
 
 ## Tests and GUI verification
 

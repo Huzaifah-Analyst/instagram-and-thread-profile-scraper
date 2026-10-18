@@ -1,4 +1,12 @@
-> **Latest update, 17 October 2026:** public-first both-Alive checks implemented.
+> **Latest update, 18 October 2026:** retained Alive flow measured **130.968s
+> for 95 targets, zero error rows**. The 120-second goal remains open. Final
+> timeout guard prevents reusing a previous profile after failed navigation.
+> Full suite: **479 passed**. Actual GUI replay checked 190 status cells with
+> zero mismatches. Rebuilt EXE starts; full packaged fallback benchmark remains
+> pending. Failed experiments and all limits are in the
+> [current shared report](2026-10-18-alive-readiness.md).
+
+> **Earlier update, 17 October 2026:** public-first both-Alive checks implemented.
 > Fresh 95-target run: **137.969s, zero error rows**, 85 IG Active and 48 Threads
 > Active. IG used public pages for all 95; Threads needed saved-login confirmation
 > for 47. Full suite: **471 passed**. The 120-second goal is still not met.

@@ -44,6 +44,7 @@ def test_threads_login_redirect_remains_unknown_without_waiting(
     assert "requires login" in result["error"]
     assert result["seconds"] < 1
     assert result["country"] is result["date_joined"] is None
+    assert page.goto.await_args.kwargs["wait_until"] == "commit"
     identity.assert_not_awaited()
 
 
@@ -76,4 +77,32 @@ def test_real_threads_ambiguous_page_has_bounded_unknown() -> None:
         result = await check_threads_status(page, "target", .6)
         assert result["status"] == "unknown" and result["error"]
         assert .5 <= result["seconds"] < 2
+    run_browser(check)
+
+
+def test_real_threads_status_does_not_wait_for_deferred_script() -> None:
+    """Visible verified identity is sufficient before DOMContentLoaded."""
+    async def check(page: Page) -> None:
+        """Hold an unrelated script until after status extraction finishes."""
+        release_script = asyncio.Event()
+
+        async def serve(route: Route) -> None:
+            """Serve the document while delaying one nonessential script."""
+            if route.request.url.endswith("slow.js"):
+                await release_script.wait()
+                await route.fulfill(body="", content_type="text/javascript")
+            else:
+                await route.fulfill(content_type="text/html", body='''
+                    <script defer src="/slow.js"></script>
+                    <div role="main"><h1>target</h1>0 followers</div>''')
+
+        await page.route("**/*", serve)
+        try:
+            result = await check_threads_status(page, "target", 2)
+            assert result["status"] == "active"
+            assert result["error"] is None
+            assert not release_script.is_set()
+        finally:
+            release_script.set()
+            await page.wait_for_load_state("domcontentloaded", timeout=2000)
     run_browser(check)

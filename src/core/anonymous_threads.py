@@ -41,7 +41,7 @@ async def check_threads_status(
     }
     try:
         await page.goto(
-            source, wait_until="domcontentloaded", timeout=timeout_s * 1000,
+            source, wait_until="commit", timeout=timeout_s * 1000,
         )
         while time.monotonic() < deadline:
             path = urlparse(page.url).path.rstrip("/")

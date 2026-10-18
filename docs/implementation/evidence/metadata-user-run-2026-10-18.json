@@ -1,0 +1,25 @@
+{
+  "source_kind": "Read-only review of user-run metadata journal, not an agent benchmark",
+  "journal": "run_20261018_073550_195000.jsonl",
+  "mode": "combined",
+  "rows": 95,
+  "threads_status": {
+    "not_found": 47,
+    "active": 48
+  },
+  "active_threads_stages": {
+    "about_menu": 6,
+    "complete": 35,
+    "about_dialog": 7
+  },
+  "active_threads_country_availability": {
+    "unresolved": 13,
+    "not_shared": 4,
+    "disclosed": 22,
+    "not_disclosed": 9
+  },
+  "date_present": 35,
+  "raw_captures_available": false,
+  "root_cause_verified": false,
+  "fresh_timing_measured": false
+}

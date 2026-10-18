@@ -248,3 +248,23 @@
   app data was refused by Windows Application Control. Packaged runtime is
   unverified; no security-policy workaround or existing-app termination.
 - [Full evidence and packaging status](implementation/2026-10-17-public-first-alive.md).
+
+## 18 October 2026: Alive readiness and final delivery
+
+- Public decision focused suite: 21 passed in 5.15s. Retained readiness target
+  set: 112 passed in 16.93s. Experimental scheduler target set: 113 passed in
+  13.98s, but scheduler code/test was subsequently reverted after live failure.
+- Final full suite: **479 passed in 117.33s, zero skips**, including a new
+  stale-DOM timeout regression and actual Chromium deferred-script cases.
+- Retained-flow live comparison: 95 unique targets in 130.968s, zero errors,
+  zero differences across both platform statuses versus the saved user run.
+  No navigation timeout in that run; no new full run after the final guard.
+- All rejected measurements are retained: blocker disabled 242.531s/7 errors;
+  public early-read intermediate 178.641s/2 errors; immediate per-platform
+  scheduler 333.094s/9 errors. None proves a specific external root cause.
+- Actual source GUI replay verified 190 cells and per-platform totals, zero
+  mismatches. It was a replay, not another network run.
+- Final PyInstaller build succeeded: 325,082,844 bytes. EXE startup and actual
+  window verified in isolated app data. Two separately initiated preview runs
+  lacked saved sessions; no timed packaged fallback acceptance is claimed.
+- [Report, full test output, build hash and screenshots](implementation/2026-10-18-alive-readiness.md).
